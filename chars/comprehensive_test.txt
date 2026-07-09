@@ -1,0 +1,121 @@
+=== COMPREHENSIVE ENCODING TEST FILE ===
+=== 编码全面测试文件（UTF-8 编码）===
+===
+=== HOW TO USE:
+=== 1. Open this file in "Encoding Viewer" → check each character's encoding support
+=== 2. Use "Encoding Converter" to test conversions to various target encodings
+===    Recommended test conversions (UTF-8 → target):
+===      UTF-8 → GBK     UTF-8 → GB2312    UTF-8 → Big5
+===      UTF-8 → Shift-JIS   UTF-8 → Extended ASCII
+===      UTF-8 → UTF-16  (should succeed 100%)
+=== 3. Compare actual results with the "Expected" comments below
+===
+
+--- SECTION 1: Pure ASCII (ALL 8 encodings support these) ---
+ABCDEFGHIJKLMNOPQRSTUVWXYZ
+abcdefghijklmnopqrstuvwxyz
+0123456789 !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~
+
+--- SECTION 2: Latin Extended-1 / cp1252 ---
+(Expected: cp1252 OK ✓ | GBK/GB2312/Big5/Shift-JIS mostly N/A)
+€   (U+20AC) Euro sign — cp1252 ONLY, all CJK encodings N/A
+Œ   (U+0152) OE ligature — cp1252 ONLY
+œ   (U+0153) oe ligature — cp1252 ONLY
+š   (U+0161) s caron — cp1252 ONLY
+ž   (U+017E) z caron — cp1252 ONLY
+ÿ   (U+00FF) y diaeresis — cp1252 ONLY
+é   (U+00E9) e acute — cp1252 OK, all CJK N/A
+è   (U+00E8) e grave — cp1252 OK, all CJK N/A
+à   (U+00E0) a grave — cp1252 OK, all CJK N/A
+ç   (U+00E7) c cedilla — cp1252 OK, all CJK N/A
+ñ   (U+00F1) n tilde — cp1252 OK, all CJK N/A
+ü   (U+00FC) u diaeresis — cp1252 OK, all CJK N/A
+
+--- SECTION 3: Simplified Chinese (GBK + GB2312 both support) ---
+(Expected: GBK OK ✓ | GB2312 OK ✓ | Big5 partial | Shift-JIS partial)
+计算机课程设计字符编码测试演示
+春夏秋冬世界你好汉字
+所有的简化汉字都应该在GBK和GB2312编码中支持
+
+Simplified-only chars (NOT in Big5 or Shift-JIS):
+计 (U+8BA1) — GBK/GB2312 only, Big5/Shift-JIS N/A
+课 (U+8BFE) — GBK/GB2312 only, Big5/Shift-JIS N/A
+设 (U+8BBE) — GBK/GB2312 only, Big5/Shift-JIS N/A
+
+--- SECTION 4: GBK-only characters (GBK supports, GB2312 does NOT) ---
+(Expected: GBK OK ✓ | GB2312 N/A ← key test! | Big5/Shift-JIS vary)
+
+True GBK-exclusive (ONLY in GBK + UTF-8, nowhere else):
+镕 (U+9555) — GBK:OK | GB2312:N/A | Big5:N/A | SJIS:N/A ✓
+嘅 (U+5605) — GBK:OK | GB2312:N/A | Big5:N/A | SJIS:N/A ✓
+
+Also in Big5 but not GB2312:
+唻 (U+553B) 嚭 (U+56AD) 囍 (U+56CD) 弢 (U+5F22) 惢 (U+60E2)
+
+Also in Big5 + Shift-JIS but not GB2312:
+孖 (U+5B56) 彧 (U+5F67)
+
+--- SECTION 5: Traditional Chinese (Big5 supports, GB2312 may NOT) ---
+(Expected: Big5 OK ✓ | GBK OK | GB2312 mostly N/A for Trad-specific chars)
+電腦課程設計字元編碼測試演示
+傳統漢字主要存在於Big5編碼中
+臺灣香港澳門使用繁體中文
+
+Trad-only chars (NOT in GB2312):
+電 (U+96FB) 腦 (U+8166) 課 (U+8AB2) 設 (U+8A2D) 計 (U+8A08)
+臺 (U+81FA) 灣 (U+7063) 澳 (U+6FB3) 門 (U+9580) 體 (U+9AD4)
+
+--- SECTION 6: Japanese (Shift-JIS supports, other CJK vary) ---
+(Expected: Shift-JIS OK ✓ | GBK OK | GB2312 partial | Big5 partial)
+Hiragana: あいうえお かきくけこ さしすせそ たちつてと
+Katakana: アイウエオ カキクケコ サシスセソ タチツテト
+Japanese: 日本語のテストです こんにちは
+Kanji: 漢字も含まれています 東京大阪京都
+
+Japanese-specific kanji (NOT in GB2312 or Big5, but in GBK + Shift-JIS):
+込 (U+8FBC) 辻 (U+8FBB) 凧 (U+51E7) 畑 (U+7551) 働 (U+50CD)
+(These are common Japanese chars not used in Chinese — many CJK readers won't recognize them)
+
+--- SECTION 7: Korean Hangul (ONLY UTF-8 / UTF-16 can encode these) ---
+(Expected: UTF-8 OK ✓ | UTF-16 OK ✓ | ALL other 6 encodings N/A)
+한국어 테스트 안녕하세요 반갑습니다
+가나다라마바사아자차카타파하
+서울 부산 제주도
+
+--- SECTION 8: Emoji & 4-byte UTF-8 (ONLY UTF-8 / UTF-16 support) ---
+(Expected: UTF-8 OK ✓ | UTF-16 OK ✓ | ALL other 6 encodings N/A)
+😀 😂 🤣 😊 😎 🚀 🌍 🎉 ❤️ 👍
+⭐ 🌙 ☀️ 🌈 🎯 🔥 💯 ✅ ❌
+
+--- SECTION 9: Mathematical & Special Symbols (mostly UTF-8 / UTF-16 only) ---
+(Expected: UTF-8 OK ✓ | UTF-16 OK ✓ | CJK encodings mostly N/A)
+∞ ≠ ≤ ≥ ∑ ∫ √ π ≈ ∠ ⊥ ∝ ∵ ∴
+α β γ δ ε ζ η θ ι κ λ μ ν ξ ο π ρ σ τ υ φ χ ψ ω
+Δ Θ Λ Ξ Π Σ Φ Ψ Ω
+
+--- SECTION 10: Mixed Multi-language Script (stresses detection scoring) ---
+(Expected: each character shows its own encoding capabilities)
+Hello 你好 こんにちは 안녕하세요 😊
+Computer 计算机 コンピュータ 컴퓨터
+World 世界 世界 세계
+123 !@# ABC abc
+
+--- SECTION 11: Control Character & Whitespace Edge Cases ---
+(Expected: viewer should display control chars as [TAB], [LF], [CR], [SP] etc.)
+TAB	separated	text	with	tabs
+Line1
+Line2
+
+
+Multiple blank lines above
+
+--- SECTION 12: CJK Ambiguity — same character, different byte values ---
+(Expected: compare GBK vs Big5 vs Shift-JIS byte values — they differ!)
+
+一 (U+4E00) — GBK:D2BB | Big5:A440 | Shift-JIS:88ea  (ALL differ!)
+中 (U+4E2D) — GBK:D6D0 | Big5:A4A4 | Shift-JIS:92ca  (ALL differ!)
+大 (U+5927) — GBK:B4F3 | Big5:A4A4 | Shift-JIS:91e5  (ALL differ!)
+国 (U+56FD) — GBK:B9FA | Big5:N/A  | Shift-JIS:N/A   (Simplified only!)
+算 (U+7B97) — GBK:CBE3 | Big5:BAE2 | Shift-JIS:8E5A  (ALL differ!)
+
+--- END OF TEST FILE ---

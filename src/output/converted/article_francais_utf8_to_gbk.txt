@@ -1,0 +1,14 @@
+La conception de circuits num¨¦riques constitue un pilier fondamental de l'ing¨¦nierie moderne. 
+Les circuits logiques programmables, tels que les FPGA, offrent une flexibilit¨¦ remarquable 
+pour la mise en ?uvre de syst¨¨mes complexes. Le langage VHDL, largement utilis¨¦ dans 
+l'industrie, permet de d¨¦crire le comportement et la structure des circuits num¨¦riques.
+
+Les d¨¦fis actuels dans la conception de mat¨¦riel incluent la r¨¦duction de la consommation 
+d'¨¦nergie, l'augmentation de la fr¨¦quence d'horloge et la gestion de la complexit¨¦ croissante 
+des syst¨¨mes sur puce. Les outils de synth¨¨se modernes jouent un r?le crucial dans 
+l'optimisation automatique des conceptions.
+
+L'architecture des ordinateurs ¨¦volue constamment pour r¨¦pondre aux exigences des 
+applications ¨¦mergentes telles que l'intelligence artificielle et le calcul haute performance.
+Les pipelines d'instructions, la m¨¦moire cache et les unit¨¦s de traitement graphique sont 
+autant de domaines de recherche active.
