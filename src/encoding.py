@@ -1,8 +1,9 @@
 """
 编码实体与注册中心 —— 项目唯一的编码数据源
 
-定义 Encdoing dataclass 和所有受支持编码的注册表。
+定义 Encoding dataclass 和所有受支持编码的注册表。
 所有模块从此处获取编码信息，不再定义/引用散装 dict。
+单一数据源原则：编码名称、颜色、映射关系均在在此定义。
 """
 
 from dataclasses import dataclass
@@ -91,11 +92,6 @@ def get_std_name(name: str) -> str:
 
 
 def resolve_std_name(name: str) -> str:
-    """显示名 → Python 标准库编解码器名（检测专用，含别名解析）
-
-    覆盖 _display_name_to_std 的所有映射规则，
-    统一编码映射入口，禁止各模块自行维护映射 dict。
-    """
     if name == "ASCII":
         return "utf-8"
     if name in VIEWER_ENCODING_MAP:

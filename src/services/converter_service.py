@@ -1,8 +1,9 @@
 """
-Converter service — encapsulates encoding conversion & compatibility.
+转换器服务 —— 封装编码转换与兼容性检查功能。
 
-All public functions return ConversionResult / CompatibilitySummary.
-GUI should never import encoding_converter or compatibility directly.
+所有公开函数均返回 ConversionResult 或 CompatibilitySummary。
+GUI 不应直接导入 encoding_converter 或 compatibility 模块。
+本模块负责将内部原始类型（raw dict、内部 Report 对象）转换为服务层公开类型。
 """
 
 from compatibility import compatibility_scan as _compat_scan
@@ -10,20 +11,20 @@ from encoding_converter import Converter, convert_file as _convert_file
 from services.result import CompatibilitySummary, ConversionResult
 
 
-# Re-export encoding/strategy registries
+# 重新导出编码与错误策略注册表，供 GUI 下拉菜单等消费方使用
 supported_encodings = Converter.SUPPORTED_ENCODINGS
 error_strategies = Converter.ERROR_STRATEGIES
 
 
 def get_strategy(display_name: str) -> str:
-    """Map display name to codec error strategy string."""
+    """将界面显示名称映射为 Python codec 错误策略字符串。"""
     return Converter.ERROR_STRATEGIES.get(display_name, "replace")
 
 
 def compatibility_scan(tokens, target_encoding: str, s2t_convert: bool = False):
-    """Scan tokens for characters not representable in target encoding.
+    """扫描 tokens 中在目标编码下无法表示的字符（兼容性检查）。
 
-    Returns CompatibilitySummary (not internal CompatibilityReport).
+    包装 internal compatibility_scan，将内部 CompatibilityReport 转换为公开的 CompatibilitySummary。
     """
     report = _compat_scan(tokens, target_encoding, s2t_convert=s2t_convert)
     return CompatibilitySummary(
@@ -39,9 +40,10 @@ def convert_file(
     source_path, tokens, src_enc, tgt_enc, output_dir,
     strategy="replace_full", s2t_convert=False,
 ):
-    """Convert file from source to target encoding.
+    """将文件从源编码转换为目标编码。
 
-    Returns ConversionResult (not raw dict).
+    包装内部 _convert_file，将原始 dict 结果转换为公开的 ConversionResult；
+    同时从 verdict 中提取校验信息并格式化为可读的 mismatch_log。
     """
     raw = _convert_file(
         source_path, tokens, src_enc, tgt_enc,

@@ -1,24 +1,24 @@
 """
-Backward-compatibility re-export stub.
+向后兼容的重新导出桩模块。
 
-All detection logic has been moved to src/detector/ subpackage.
-This module exists only so that existing import paths continue to work.
+所有检测逻辑已迁移至 src/detector/ 子包。
+本模块仅用于保证旧导入路径（如 from file_detector import FileEncodingDetector）仍然可用。
 """
 
-# Pipeline (public API)
+# 管道 —— 公开 API
 from detector.pipeline import (
     detect_with_full_decision,
     FileEncodingDetector,
 )
 
-# Anchors
+# 锚点 —— BOM 检测 / 纯 ASCII 判断 / UTF-16 结构探测
 from detector.anchors import (
     _bom_anchor,
     _is_pure_ascii_bytes,
     _utf16_structural_anchor,
 )
 
-# Agents
+# 检测代理 —— 各编码专有检测器
 from detector.agents import (
     _ALL_AGENTS,
     _extended_ascii_agent,
@@ -32,7 +32,7 @@ from detector.agents import (
     SHIFT_JIS_AGENT,
 )
 
-# Decision engine
+# 决策引擎 —— 内容判别 / 代理调度 / 置信度归一化
 from detector.decision import (
     _content_discriminator,
     _run_agents,
