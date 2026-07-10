@@ -1,0 +1,17 @@
+French Characters (Caractères français)
+=========================================
+
+Accented lowercase: à â ä ç é è ê ë ï î ô ö ù û ü ÿ
+Accented uppercase: À Â Ä Ç É È Ê Ë Ï Î Ô Ö Ù Û Ü Ÿ
+Ligature: œ Œ æ Æ
+Special: « » €
+
+Common words:
+- français (French)
+- été (summer)
+- hôtel (hotel)
+- cœur (heart)
+- ça va (how are you)
+- très (very)
+- Noël (Christmas)
+- garçon (boy)

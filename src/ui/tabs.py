@@ -30,7 +30,7 @@ from ui.widgets import create_button, create_horizontal_separator, create_vertic
 
 
 logger = logging.getLogger(__name__)
-CHARS_DIR = Path("D:/code/HardDesignProj/chars")
+CHARS_DIR = Path("D:/code/HardDesignProj/demo_chars")
 CONVERT_DIR = Path(__file__).parent.parent / "output" / "converted"
 DEFAULT_STATUS = f"就绪   |   {CHARS_DIR}"
 

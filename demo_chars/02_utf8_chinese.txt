@@ -1,0 +1,4 @@
+字符编码检测系统
+Character Encoding Detector
+2026 Demo
+支持中文、English、数字 123

@@ -1,0 +1,4 @@
+Hello Encoding Demo!
+ABC123
+0123456789
+!@#$%^&*()

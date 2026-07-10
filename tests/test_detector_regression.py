@@ -47,6 +47,14 @@ def _gbk_agent_original(raw_data):
     score = (byte_score * 0.4 + analysis["cjk_ratio"] * 0.3
              + min(1.0, analysis["script_score"]) * 0.3
              - space_penalty - ctrl_penalty)
+    # Negative feature: cross-encoding kana check (mirrors GBK_AGENT)
+    sjis_text = strict_decode(raw_data, "cp932")
+    if sjis_text is not None:
+        sjis_analysis = analyze_text(sjis_text)
+        kana_r = sjis_analysis["kana_ratio"]
+        if kana_r > 0.001:
+            penalty = min(0.35, kana_r * 0.65)
+            score -= penalty
     return {"GBK": max(0.0, min(1.0, score))}
 
 
@@ -231,8 +239,14 @@ class TestDetectPipeline(unittest.TestCase):
     def test_shift_jis_japanese(self):
         data = '日本語'.encode('cp932')
         result = detect_with_full_decision(data)
-        # Short SJIS text is often detected as GBK — acceptable ambiguity
+        # Short pure-CJK SJIS text (no kana) may still be ambiguous
         self.assertIn(result['encoding'], ('GBK', 'Shift-JIS'))
+
+    def test_shift_jis_with_kana(self):
+        """含假名的 Shift-JIS 必须正确检测"""
+        data = '日本語テスト'.encode('cp932')
+        result = detect_with_full_decision(data)
+        self.assertEqual(result['encoding'], 'Shift-JIS')
 
     def test_utf16_le(self):
         self._check_result('Hello World'.encode('utf-16-le'), 'UTF-16 LE')
@@ -322,6 +336,84 @@ class TestAllAgentsCallable(unittest.TestCase):
         self.assertEqual(GBK_AGENT.display_name, 'GBK')
         self.assertEqual(BIG5_AGENT.display_name, 'Big5')
         self.assertEqual(SHIFT_JIS_AGENT.display_name, 'Shift-JIS')
+
+
+class TestShiftJISDetection(unittest.TestCase):
+    """验证 Shift-JIS 日文检测正确性（含平假名、片假名、汉字）"""
+
+    KANA_SAMPLES = [
+        ("kana_katakana", "プログラム"),
+        ("kana_hiragana", "こんにちは"),
+        ("kana_mixed", "日本語テスト"),
+        ("kana_long", "Hello! 日本語プログラミングテスト。データ構造。"),
+        ("kana_hira_katakana", "こんにちは世界プログラム"),
+    ]
+
+    def test_shift_jis_detected_as_top_candidate(self):
+        """Shift-JIS 文本必须检测为 Shift-JIS（top candidate）"""
+        for name, text in self.KANA_SAMPLES:
+            raw = text.encode("cp932")
+            result = detect_with_full_decision(raw)
+            top1 = result["encoding"]
+            self.assertEqual(
+                top1, "Shift-JIS",
+                f"{name}: expected Shift-JIS, got {top1} "
+                f"(candidates={result['top_candidates'][:3]})"
+            )
+
+    def test_shift_jis_confidence_not_degraded(self):
+        """Shift-JIS 置信度不应低于 0.5"""
+        for name, text in self.KANA_SAMPLES:
+            raw = text.encode("cp932")
+            result = detect_with_full_decision(raw)
+            self.assertGreater(
+                result["confidence"], 0.5,
+                f"{name}: confidence {result['confidence']} too low"
+            )
+
+    def test_gbk_still_detected_as_gbk(self):
+        """GBK 中文检测不受影响"""
+        gbk_texts = [
+            ("basic", "计算机课程设计"),
+            ("longer", "数据结构与算法分析"),
+            ("mixed", "Hello 你好世界"),
+        ]
+        for name, text in gbk_texts:
+            raw = text.encode("gbk")
+            result = detect_with_full_decision(raw)
+            self.assertEqual(
+                result["encoding"], "GBK",
+                f"{name}: expected GBK, got {result['encoding']}"
+            )
+
+    def test_big5_still_detected_as_big5(self):
+        """Big5 繁体中文检测不受影响"""
+        big5_texts = [
+            ("mixed", "Hello 你好世界"),
+            ("longer", "電腦程式設計資料結構和演算法"),
+        ]
+        for name, text in big5_texts:
+            raw = text.encode("big5")
+            result = detect_with_full_decision(raw)
+            self.assertEqual(
+                result["encoding"], "Big5",
+                f"{name}: expected Big5, got {result['encoding']}"
+            )
+
+    def test_utf8_detection_unaffected(self):
+        """UTF-8 检测不受影响"""
+        utf8_texts = [
+            ("chinese", "你好世界"),
+            ("emoji", "Hello 😀🚀 你好"),
+            ("mixed", "Hello 你好"),
+        ]
+        for name, text in utf8_texts:
+            raw = text.encode("utf-8")
+            result = detect_with_full_decision(raw)
+            self.assertEqual(
+                result["encoding"], "UTF-8",
+                f"{name}: expected UTF-8, got {result['encoding']}"
+            )
 
 
 if __name__ == '__main__':

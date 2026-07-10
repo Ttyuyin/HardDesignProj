@@ -62,6 +62,9 @@ class EncodingDetectionAgent:
                 - "script": 文字体系连贯性权重
                 - "kana": 假名比例权重（用于 Shift-JIS 区分）
                 - "bopomofo": 注音符号比例权重（用于 Big5 区分）
+                - "negative_features": dict, 负向特征
+                    - "kana": 交叉编码假名惩罚权重（GBK 专用）。
+                      尝试用 cp932 解码，若含假名则降低 GBK 分数。
         """
         self.display_name = display_name
         self.codec = codec
@@ -93,6 +96,19 @@ class EncodingDetectionAgent:
         if "bopomofo" in self.feature_weights:
             score += analysis["bopomofo_ratio"] * self.feature_weights["bopomofo"]
 
+        # 负向特征：存在某些信号时降低得分
+        # 用于解决 GBK 误判 Shift-JIS 的问题（日文假名在 GBK 中罕见）
+        neg = self.feature_weights.get("negative_features", {})
+        for feat_name, feat_weight in neg.items():
+            if feat_name == "kana":
+                sjis_text = strict_decode(raw_data, "cp932")
+                if sjis_text is not None:
+                    sjis_analysis = analyze_text(sjis_text)
+                    kana_r = sjis_analysis["kana_ratio"]
+                    if kana_r > 0.001:
+                        penalty = min(0.35, kana_r * feat_weight)
+                        score -= penalty
+
         score -= space_penalty
         score -= ctrl_penalty
 
@@ -100,11 +116,18 @@ class EncodingDetectionAgent:
 
 
 # GBK Agent：字节评分 40% + CJK 比例 30% + 文字连贯性 30%
+# negative_features.kana：交叉编码假名惩罚，解决 Shift-JIS 误判为 GBK 的问题。
+# 当原始字节同时能被 cp932 解码且含假名时，降低 GBK 分数。
 GBK_AGENT = EncodingDetectionAgent(
     display_name="GBK",
     codec="gbk",
     byte_scorer=score_gbk,
-    feature_weights={"byte": 0.4, "cjk": 0.3, "script": 0.3},
+    feature_weights={
+        "byte": 0.4,
+        "cjk": 0.3,
+        "script": 0.3,
+        "negative_features": {"kana": 0.65},
+    },
 )
 
 # Big5 Agent：字节评分 40% + CJK 20% + 文字连贯性 20% + 注音符号 20%

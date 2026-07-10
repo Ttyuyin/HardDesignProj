@@ -1,0 +1,20 @@
+======================================================================
+Demo Dataset Verification Report
+======================================================================
+File                                       Encoding       Size     Status    
+------------------------------------------ -------------- -------- ----------
+01_ascii.txt                               ASCII          50       PASS      
+02_utf8_chinese.txt                        UTF-8          99       PASS      
+03_utf16le.txt                             UTF-16 LE      106      PASS      
+04_utf16be.txt                             UTF-16 BE      106      PASS      
+05_gbk_chinese.txt                         GBK            69       PASS      
+06_big5_traditional.txt                    Big5           62       PASS      
+07_shiftjis_japanese.txt                   Shift-JIS      77       PASS      
+conversion_cases/case1_utf8_to_gbk.txt     UTF-8          50       PASS      
+conversion_cases/case2_big5_to_gbk.txt     Big5           43       PASS      
+conversion_cases/case3_shiftjis_to_utf8.txt Shift-JIS      48       PASS      
+conversion_cases/case4_utf16_to_utf8.txt   UTF-16 LE      90       PASS      
+----------------------------------------------------------------------
+
+PASS: 11/11
+FAIL: 0/11

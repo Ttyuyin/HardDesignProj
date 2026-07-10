@@ -12,3 +12,59 @@
 2026-07-09 22:12:08 | INFO    | root | Log file: d:\code\HardDesignProj\src\logs\encoding.log
 2026-07-09 22:12:08 | INFO    | root | ==================================================
 2026-07-09 22:12:10 | INFO    | root | System exited normally
+2026-07-09 22:59:10 | INFO    | root | ==================================================
+2026-07-09 22:59:10 | INFO    | root | 字符编码显示与转换系统启动
+2026-07-09 22:59:10 | INFO    | root | 日志文件: d:\code\HardDesignProj\src\logs\encoding.log
+2026-07-09 22:59:10 | INFO    | root | ==================================================
+2026-07-09 22:59:35 | INFO    | root | 系统正常退出
+2026-07-10 14:20:32 | INFO    | root | ==================================================
+2026-07-10 14:20:32 | INFO    | root | 字符编码显示与转换系统启动
+2026-07-10 14:20:32 | INFO    | root | 日志文件: d:\code\HardDesignProj\src\logs\encoding.log
+2026-07-10 14:20:32 | INFO    | root | ==================================================
+2026-07-10 15:05:18 | INFO    | root | ==================================================
+2026-07-10 15:05:18 | INFO    | root | 字符编码显示与转换系统启动
+2026-07-10 15:05:18 | INFO    | root | 日志文件: d:\code\HardDesignProj\src\logs\encoding.log
+2026-07-10 15:05:18 | INFO    | root | ==================================================
+2026-07-10 15:15:09 | INFO    | root | 系统正常退出
+2026-07-10 15:15:32 | INFO    | root | ==================================================
+2026-07-10 15:15:32 | INFO    | root | 字符编码显示与转换系统启动
+2026-07-10 15:15:32 | INFO    | root | 日志文件: d:\code\HardDesignProj\src\logs\encoding.log
+2026-07-10 15:15:32 | INFO    | root | ==================================================
+2026-07-10 15:15:45 | INFO    | encoding_converter | Conversion successful: 06_big5_traditional.txt -> 06_big5_traditional_big5_to_gbk.txt (GBK) (verified: reversible)
+2026-07-10 15:16:07 | INFO    | encoding_converter | Conversion successful: 06_big5_traditional_big5_to_gbk.txt -> 06_big5_traditional_big5_to_gbk_gbk_to_big5.txt (Big5) (verified: reversible)
+2026-07-10 15:16:23 | INFO    | root | 系统正常退出
+2026-07-10 15:36:00 | INFO    | root | ==================================================
+2026-07-10 15:36:00 | INFO    | root | 字符编码显示与转换系统启动
+2026-07-10 15:36:00 | INFO    | root | 日志文件: d:\code\HardDesignProj\src\logs\encoding.log
+2026-07-10 15:36:00 | INFO    | root | ==================================================
+2026-07-10 15:46:25 | INFO    | encoding_converter | Conversion successful: 05_gbk_chinese.txt -> 05_gbk_chinese_gbk_to_shiftjis.txt (Shift-JIS) (verified: not reversible)
+2026-07-10 15:47:17 | INFO    | encoding_converter | Conversion successful: 06_big5_traditional.txt -> 06_big5_traditional_big5_to_shiftjis.txt (Shift-JIS) (verified: reversible)
+2026-07-10 15:51:27 | INFO    | encoding_converter | Conversion successful: 07_shiftjis_japanese.txt -> 07_shiftjis_japanese_shiftjis_to_big5.txt (Big5) (verified: not reversible)
+2026-07-10 15:51:41 | INFO    | encoding_converter | Conversion successful: 07_shiftjis_japanese.txt -> 07_shiftjis_japanese_shiftjis_to_gbk.txt (GBK) (verified: reversible)
+2026-07-10 15:53:42 | INFO    | root | ==================================================
+2026-07-10 15:53:42 | INFO    | root | 字符编码显示与转换系统启动
+2026-07-10 15:53:42 | INFO    | root | 日志文件: d:\code\HardDesignProj\src\logs\encoding.log
+2026-07-10 15:53:42 | INFO    | root | ==================================================
+2026-07-10 15:54:15 | INFO    | encoding_converter | Conversion successful: 06_big5_traditional.txt -> 06_big5_traditional_big5_to_gbk.txt (GBK) (verified: reversible)
+2026-07-10 15:54:33 | INFO    | encoding_converter | Conversion successful: 04_utf16be.txt -> 04_utf16be_utf16_be_to_gbk.txt (GBK) (verified: reversible)
+2026-07-10 16:11:56 | INFO    | root | ==================================================
+2026-07-10 16:11:56 | INFO    | root | 字符编码显示与转换系统启动
+2026-07-10 16:11:56 | INFO    | root | 日志文件: d:\code\HardDesignProj\src\logs\encoding.log
+2026-07-10 16:11:56 | INFO    | root | ==================================================
+2026-07-10 16:12:37 | INFO    | root | 系统正常退出
+2026-07-10 16:12:53 | INFO    | root | ==================================================
+2026-07-10 16:12:53 | INFO    | root | 字符编码显示与转换系统启动
+2026-07-10 16:12:53 | INFO    | root | 日志文件: d:\code\HardDesignProj\src\logs\encoding.log
+2026-07-10 16:12:53 | INFO    | root | ==================================================
+2026-07-10 16:13:07 | INFO    | encoding_converter | Conversion successful: 06_big5_traditional.txt -> 06_big5_traditional_big5_to_gbk.txt (GBK) (verified: reversible)
+2026-07-10 16:13:28 | INFO    | encoding_converter | Conversion successful: 06_big5_traditional.txt -> 06_big5_traditional_big5_to_gbk.txt (GBK) (verified: reversible)
+2026-07-10 16:13:46 | INFO    | encoding_converter | Conversion successful: 06_big5_traditional_big5_to_gbk.txt -> 06_big5_traditional_big5_to_gbk_gbk_to_big5.txt (Big5) (verified: reversible)
+2026-07-10 16:15:59 | INFO    | root | ==================================================
+2026-07-10 16:15:59 | INFO    | root | 字符编码显示与转换系统启动
+2026-07-10 16:15:59 | INFO    | root | 日志文件: d:\code\HardDesignProj\src\logs\encoding.log
+2026-07-10 16:15:59 | INFO    | root | ==================================================
+2026-07-10 16:16:16 | INFO    | encoding_converter | Conversion successful: korean_chars.txt -> korean_chars_utf8_to_gbk.txt (GBK) (verified: not reversible)
+2026-07-10 16:16:43 | INFO    | encoding_converter | Conversion successful: korean_chars.txt -> korean_chars_utf8_to_big5.txt (Big5) (verified: not reversible)
+2026-07-10 16:16:56 | INFO    | encoding_converter | Conversion successful: french_chars.txt -> french_chars_utf8_to_big5.txt (Big5) (verified: not reversible)
+2026-07-10 16:17:12 | INFO    | encoding_converter | Conversion successful: french_chars.txt -> french_chars_utf8_to_gbk.txt (GBK) (verified: not reversible)
+2026-07-10 16:17:46 | INFO    | root | 系统正常退出

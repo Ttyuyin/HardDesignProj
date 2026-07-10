@@ -1,8 +1,21 @@
 # 字符编码显示与转换系统
 
-基于 Python + Tkinter 的编码检测、显示、转换工具。
+基于 Python 3 + Tkinter 的编码检测、显示、转换工具。支持 GBK / Big5 / Shift-JIS / UTF-8 / UTF-16 等多编码自动识别与互转。
 
-## 运行
+## 目录
+
+- [快速开始](#快速开始)
+- [测试](#测试)
+- [编码检测流程](#一编码检测流程打开文件--判断编码)
+- [编码转换流程](#二编码转换流程utf-8--gbk)
+- [字符 HEX 查看流程](#三字符-hex-查看流程输入中--看到各编码字节)
+- [文件结构](#文件结构)
+- [分层依赖](#分层依赖)
+- [演示数据集](#演示数据集)
+
+---
+
+## 快速开始
 
 ```powershell
 python src/main.py
@@ -145,7 +158,7 @@ python -m unittest discover -s tests -p "test_*.py" -v
 │ compatibility.py  (转换前检查) │  │ encoding_converter.py (真正转换)│
 │                              │  │                              │
 │  输入: CharacterToken[]      │  │  Converter.convert_tokens()  │
-│        target_encoding="GBK" │  │                              │
+│       target_encoding="GBK" │  │                              │
 │                              │  │  遍历每个 token:              │
 │  对每个字符:                  │  │    char.encode("gbk")        │
 │    char.encode("gbk")        │  │    → bytes                  │
@@ -157,9 +170,10 @@ python -m unittest discover -s tests -p "test_*.py" -v
 │      problem_count, problems }│ │  依赖: encoding.py           │
 │                              │  │        compatibility.py     │
 │  依赖: encoding.py           │  │                              │
-│        character_token.py   │  └──────────────┬───────────────┘
+│       character_token.py   │  └──────────────┬───────────────┘
 └──────────────────────────────┘                 │
-                                                 ▼
+                                                  │
+                                                  ▼
                     ┌──────────────────────────────────────────────┐
                     │ verifier.py  (转换后验证)                    │
                     │                                              │
@@ -288,8 +302,6 @@ python -m unittest discover -s tests -p "test_*.py" -v
 
 **查看字符 HEX：** `tabs.py` → `encoding_viewer.py` → `display_utils.py` → `tables.py`
 
-重构前一个 `file_detector.py` + `gui.py` 揉在一起，反而看不清每次操作经过了什么。现在每个文件职责单一，路径反而是明确的。
-
 ---
 
 ## 文件结构
@@ -332,6 +344,10 @@ src/
 ├── logs/
 └── output/converted/
 ```
+
+## 演示数据集
+
+`demo_chars/` 目录包含 11 个编码文件（含 ASCII / UTF-8 / UTF-16 LE/BE / GBK / Big5 / Shift-JIS），用于演示检测与转换功能。详情见 `demo_chars/README.txt`。
 
 ## 分层依赖
 
