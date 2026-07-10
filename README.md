@@ -360,3 +360,135 @@ src/
                ↙                ↙    ↘
        Core (encoding, display_utils, character_token, byte_validator, text_analyzer, ...)
 ```
+
+---
+
+## 代码架构与调用逻辑
+
+### 分层架构全景
+
+```
+                    ┌─────────────────┐
+                    │    main.py      │  ← 入口
+                    │  └─ gui.py*     │  ← 兼容存根
+                    │  └─ file_detector.py* │
+                    └────────┬────────┘
+                             │
+                    ┌────────▼────────┐
+                    │  ui/  (界面层)   │
+                    │  app.py         │  ← 主窗口
+                    │  tabs.py        │  ← 两个标签页
+                    │  tables.py      │  ← Canvas 表格
+                    │  widgets.py     │  ← 图例/按钮工厂
+                    └────────┬────────┘
+                             │
+                    ┌────────▼────────┐
+                    │  services/       │  ← Facade 层
+                    │  detector_service│     GUI 唯一入口
+                    │  converter_service│
+                    │  result.py      │  ← 公共数据类型
+                    └────┬────┬───────┘
+                         │    │
+              ┌──────────▼┐  ┌▼──────────────────┐
+              │ detector/ │  │ encoding_converter │
+              │ pipeline  │  │ encoding_viewer    │
+              │ anchors   │  │ compatibility      │
+              │ agents    │  │ verifier           │
+              │ decision  │  │ converter_utils    │
+              └──────────┬┘  └┬───────────────────┘
+                         │    │
+              ┌──────────▼────▼──────────────────┐
+              │     Core（核心层）                 │
+              │  encoding.py      ← 编码注册中心   │
+              │  character_token  ← Token 数据类   │
+              │  byte_validator   ← 字节校验评分    │
+              │  text_analyzer    ← Unicode 分析   │
+              │  decode_utils     ← 统一解码        │
+              │  display_utils    ← HEX/码点格式化   │
+              └───────────────────────────────────┘
+```
+
+### 全部文件职责清单
+
+#### 入口与兼容存根
+
+| 文件 | 角色 | 核心函数/类 | 被谁调用 | 依赖 |
+|------|------|------------|---------|------|
+| `main.py` | 程序入口 | `main()` | `python main.py` | `gui.py` |
+| `gui.py` | 向后兼容存根 | `MainWindow`（re-export） | `main.py` | `ui/app.py` |
+| `file_detector.py` | 向后兼容存根 | `FileEncodingDetector`（re-export） | 旧代码兼容 | `detector/pipeline.py` |
+
+#### Core 层（被依赖，无业务逻辑）
+
+| 文件 | 角色 | 核心函数/类 | 被谁调用 | 依赖 |
+|------|------|------------|---------|------|
+| `encoding.py` | **编码注册中心** — 唯一定义所有编码的显示名、标准名、颜色、检测/查看/转换映射 | `Encoding` dataclass, `ALL_ENCODINGS`, `DETECTION_ORDER`, `VIEWER_ENCODING_MAP`, `CONVERTER_ENCODING_MAP` | **所有上层模块** | 无 |
+| `character_token.py` | **字符令牌** — 记录字符、来源编码、原始字节、目标编码 | `CharacterToken` dataclass | `pipeline.py`, `encoding_viewer.py`, `encoding_converter.py`, `converter_utils.py`, `tables.py` | `display_utils.py` |
+| `display_utils.py` | **格式化工具** — 字节→HEX、字符→U+XXXX | `bytes_to_hex()`, `codepoint_display()` | `character_token.py`, `encoding_viewer.py`, `verifier.py`, `tables.py` | 无 |
+| `decode_utils.py` | **统一解码** — 封装 try/except 解码 | `strict_decode()` | `agents.py` | 无 |
+| `text_analyzer.py` | **Unicode 文本分析** — 字符分类+cjk/假名/注音比例+加权评分 | `char_category()`, `analyze_text()`, `text_script_score()` | `agents.py`, `decision.py` | 无 |
+| `byte_validator.py` | **字节合法性评分** — 逐字节统计合法多字节序列占比 | `score_multibyte_validity()`, `score_gbk/score_big5/score_sjis` | `agents.py` | 无 |
+
+#### Detector 层（编码检测引擎）
+
+| 文件 | 角色 | 核心函数/类 | 被谁调用 | 依赖 |
+|------|------|------------|---------|------|
+| `detector/anchors.py` | **硬规则锚点** — BOM / 纯 ASCII / UTF-16 结构 | `_bom_anchor()`, `_is_pure_ascii_bytes()`, `_utf16_structural_anchor()` | `pipeline.py`（Layer 1） | 无 |
+| `detector/agents.py` | **编码评分代理** — 7 个 agent 各自打分 | `_run_agents()`, `_utf8_agent`, `EncodingDetectionAgent`(GBK/Big5/SJIS), `_utf16le_agent`, `_utf16be_agent`, `_extended_ascii_agent` | `pipeline.py`（Layer 2） | `byte_validator.py`, `decode_utils.py`, `text_analyzer.py`, `encoding.py` |
+| `detector/decision.py` | **最终决策** — softmax + 内容消歧 | `_content_discriminator()`, `_softmax(values, temp=10.0)` | `pipeline.py`（Layer 3） | `encoding.py`, `text_analyzer.py` |
+| `detector/pipeline.py` | **检测流水线编排** — L1→L2→L3 + 公开 API | `detect_with_full_decision()`, `FileEncodingDetector`(detect_file/detect_bytes/diagnose_detect/file_to_tokens/charset_detect) | `services/detector_service.py` | `anchors.py`, `agents.py`, `decision.py`, `encoding.py`, `character_token.py` |
+
+#### Converter / Viewer / Verifier（转换与查看核心逻辑）
+
+| 文件 | 角色 | 核心函数/类 | 被谁调用 | 依赖 |
+|------|------|------------|---------|------|
+| `encoding_converter.py` | **编码转换器** — 逐字符 encode + 写文件 | `Converter._encode()`, `convert_file()` | `services/converter_service.py` | `encoding.py`, `compatibility.py`, `verifier.py` |
+| `encoding_viewer.py` | **编码查看器** — 逐字符分析各编码字节表示 | `EncodingViewer.analyze_tokens()`, `get_statistics()` | `ui/tabs.py` | `encoding.py`, `display_utils.py` |
+| `compatibility.py` | **转换前兼容扫描** — 预览不可编码字符 | `compatibility_scan()`, `get_s2t_translator()` | `services/converter_service.py` | `encoding.py` |
+| `verifier.py` | **转换后验证** — 标准库独立解码比对 | `ConversionVerifier.verify_roundtrip()` | `encoding_converter.py` | `encoding.py`, `display_utils.py` |
+| `converter_utils.py` | **Token 显示格式化** | `token_target_display()` | `ui/tables.py` | `encoding.py` |
+
+#### Services 层（GUI 的 Facade 入口）
+
+| 文件 | 角色 | 核心函数/类 | 被谁调用 | 依赖 |
+|------|------|------------|---------|------|
+| `services/result.py` | **公共数据类型** — 服务层结果封装 | `DetectionResult`, `CompatibilitySummary`, `ConversionResult` | `detector_service.py`, `converter_service.py`, `ui/tabs.py` | 无 |
+| `services/detector_service.py` | **检测服务门面** — 封装 FileEncodingDetector | `diagnose_from_raw()`, `file_to_tokens()`, `detect_bytes()`, `charset_detect()` | `ui/tabs.py` | `detector/pipeline.py`, `services/result.py` |
+| `services/converter_service.py` | **转换服务门面** — 封装 Converter/compatibility/verifier | `compatibility_scan()`, `convert_file()`, `supported_encodings`, `error_strategies` | `ui/tabs.py` | `encoding_converter.py`, `compatibility.py`, `services/result.py` |
+
+#### UI 层（界面交互）
+
+| 文件 | 角色 | 核心函数/类 | 被谁调用 | 依赖 |
+|------|------|------------|---------|------|
+| `ui/app.py` | **主窗口** — Tk + Notebook + 两个标签页 | `MainWindow` | `gui.py` | `ui/tabs.py` |
+| `ui/tabs.py` | **两个功能标签页** — 编码查看器 & 编码转换器 | `EncodingViewerTab`(_open_file/_analyze), `EncodingConverterTab`(_sel_file/_do_convert) | `ui/app.py` | `services/*`, `encoding_viewer.py`, `ui/tables.py`, `ui/widgets.py` |
+| `ui/tables.py` | **Canvas 绘制表格** — 编码兼容表 + 转换结果表 | `ColoredTable`, `ConversionResultTable` | `ui/tabs.py` | `encoding.py`, `display_utils.py`, `converter_utils.py` |
+| `ui/widgets.py` | **UI 组件工厂** — 按钮/图例/分隔线 | `create_button()`, `ColorLegend` | `ui/tabs.py` | 无 |
+
+### 三条核心数据流路径
+
+```
+🔍 检测路径：
+   main.py → app.py → viewer_tab._open_file()
+   → detector_service.diagnose_from_raw()
+   → pipeline.detect_with_full_decision()
+     → anchors (BOM / ASCII / UTF-16)
+     → agents (7 个编码评分)
+     → decision (softmax + 内容消歧)
+   → encoding.py (查编码映射表)
+   → tabs.py 更新界面
+
+🔄 转换路径：
+   main.py → app.py → converter_tab._do_convert()
+   → converter_service.compatibility_scan() → compatibility.py
+   → converter_service.convert_file() → encoding_converter.encode()
+   → verifier.verify_roundtrip() 验证无损
+   → tabs.py 显示结果
+
+📊 查看路径：
+   main.py → app.py → viewer_tab._analyze()
+   → encoding_viewer.analyze_tokens()
+     → 遍历 ALL_ENCODINGS, 尝试 char.encode(std_name)
+   → display_utils.bytes_to_hex()
+   → tables.py ColoredTable 渲染
+```
