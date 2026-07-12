@@ -10,8 +10,8 @@ import sys
 import tkinter as tk
 from tkinter import filedialog, font, messagebox, TclError, ttk
 
-from character_token import CharacterToken
-from encoding_viewer import EncodingViewer
+from shared.character_token import CharacterToken
+from viewer.viewer import EncodingViewer
 from services.converter_service import (
     convert_file,
     compatibility_scan,

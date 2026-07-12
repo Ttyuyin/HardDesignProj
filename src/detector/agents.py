@@ -5,9 +5,9 @@ Layer 2: 独立评分 Agent（编码评分层）
 各 Agent 互不依赖，结果由 Layer 3 决策引擎合并判定。
 """
 
-from byte_validator import score_gbk, score_big5, score_sjis
-from decode_utils import strict_decode
-from text_analyzer import analyze_text, char_category, text_script_score
+from detector.byte_validator import score_gbk, score_big5, score_sjis
+from detector.decode_utils import strict_decode
+from detector.text_analyzer import analyze_text, char_category, text_script_score
 
 
 # ── Agent: UTF-8 ──

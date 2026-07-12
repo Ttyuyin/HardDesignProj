@@ -2,305 +2,207 @@
 
 基于 Python 3 + Tkinter 的编码检测、显示、转换工具。支持 GBK / Big5 / Shift-JIS / UTF-8 / UTF-16 等多编码自动识别与互转。
 
-## 目录
-
-- [快速开始](#快速开始)
-- [测试](#测试)
-- [编码检测流程](#一编码检测流程打开文件--判断编码)
-- [编码转换流程](#二编码转换流程utf-8--gbk)
-- [字符 HEX 查看流程](#三字符-hex-查看流程输入中--看到各编码字节)
-- [文件结构](#文件结构)
-- [分层依赖](#分层依赖)
-- [演示数据集](#演示数据集)
-
----
-
 ## 快速开始
 
 ```powershell
 python src/main.py
+python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-## 测试
+## 目录
 
-```powershell
-python -m unittest discover -s tests -p "test_*.py" -v
+- [项目架构](#项目架构)
+- [三条核心数据流](#三条核心数据流)
+- [编码检测流程（打开文件 → 判断编码）](#一编码检测流程打开文件--判断编码)
+- [编码转换流程（UTF-8 → GBK）](#二编码转换流程utf-8--gbk)
+- [字符 HEX 查看流程（输入"中"→ 看到各编码字节）](#三字符-hex-查看流程输入中--看到各编码字节)
+- [核心评分机制：byte_validator + text_analyzer](#四核心评分机制byte_validator--text_analyzer)
+- [7 个评分 Agent](#五7-个评分-agent)
+- [文件结构](#文件结构)
+
+---
+
+## 项目架构
+
+```
+                 main.py
+                    │
+              ┌─────▼─────┐
+              │   ui/     │  ← Tkinter 界面层
+              │  app.py   │     MainWindow
+              │  tabs.py  │     两个标签页
+              │  tables.py│     Canvas 表格
+              │  widgets.py│    图例/按钮工厂
+              └─────┬─────┘
+                    │
+              ┌─────▼─────┐
+              │ services/ │  ← Facade 层（GUI 唯一入口）
+              │ detector_ │     services/result.py 定义
+              │ converter_│     DetectionResult / ConversionResult 等
+              └──┬───┬────┘
+                 │   │
+       ┌─────────▼┐ ┌▼──────────────┐
+       │ detector│ │ converter/    │
+       │ pipeline│ │ converter.py  │
+       │ anchors │ │ verifier.py   │
+       │ agents  │ │ compatibility │
+       │ decision│ │ converter_    │
+       │ byte_   │ │ utils.py      │
+       │ validator│ └───────────────┘
+       │ text_   │
+       │ analyzer│
+       │ decode_ │
+       │ utils   │
+       └─────────┘
+           │           │
+       ┌───▼───────────▼────┐
+       │  shared/           │
+       │  encoding.py       │  ← 编码注册中心（唯一数据源）
+       │  character_token.py│  ← CharacterToken 数据类
+       │  display_utils.py  │  ← bytes_to_hex / codepoint_display
+       └────────────────────┘
 ```
 
 ---
 
 ## 一、编码检测流程（打开文件 → 判断编码）
 
-用户点击"打开文件"，选择一个 GBK 编码的 txt，系统如何判断出"这是 GBK"？
+### 调用链
 
 ```
-用户点击按钮
-     │
-     ▼
-┌──────────────────────────────────────────────────────────────┐
-│ ui/tabs.py  (EncodingViewerTab._open_file)                   │
-│  弹文件选择框、调用服务、更新界面                                │
-│  不知道 GBK/UTF8 怎么判断——只管调服务                            │
-└────────────────────────────────┬─────────────────────────────┘
-                                 │
-                                 ▼
-┌──────────────────────────────────────────────────────────────┐
-│ services/detector_service.py  (检测业务门面)                   │
-│  diagnose_from_raw() → 读取 bytes + 调用检测器 + 整理结果      │
-│  返回 DetectionResult { encoding, std_name, trials }          │
-└────────────────────────────────┬─────────────────────────────┘
-                                 │
-                                 ▼
-┌──────────────────────────────────────────────────────────────┐
-│ detector/pipeline.py  (FileEncodingDetector)                  │
-│  编排检测流程：anchors → agents → decision                    │
-│  detect_with_full_decision()                                  │
-└──────────────┬───────────────────────────────────┬───────────┘
-               │                                   │
-               ▼                                   ▼
-┌──────────────────────────────┐  ┌──────────────────────────────┐
-│ detector/anchors.py  (硬规则) │  │ detector/agents.py  (编码评分) │
-│                              │  │                              │
-│  BOM 探测                    │  │  _utf8_agent()               │
-│   FF FE         → UTF-16 LE  │  │   → decode utf-8 + 计算评分   │
-│   EF BB BF      → UTF-8      │  │                              │
-│                              │  │  GBK_AGENT (EncodingDetectionAgent)
-│  纯 ASCII 短路                │  │   → byte_score * 0.4        │
-│   所有字节 < 128 → ASCII      │  │   → cjk_ratio * 0.3         │
-│                              │  │   → script_score * 0.3       │
-│  UTF-16 结构锚点              │  │                              │
-│   偶数/奇数 null 比例         │  │  BIG5_AGENT                  │
-│                              │  │  SHIFT_JIS_AGENT             │
-│  依赖: 无                     │  │  _utf16le_agent              │
-│                              │  │  _utf16be_agent              │
-│                              │  │  _extended_ascii_agent       │
-│                              │  │                              │
-│                              │  │  各 agent 返回 {编码: 评分}   │
-│                              │  │                              │
-│                              │  │  依赖: byte_validator.py     │
-│                              │  │        decode_utils.py       │
-│                              │  │        text_analyzer.py      │
-│                              │  │        encoding.py           │
-└──────────────────────────────┘  └──────────────┬───────────────┘
-                                                  │
-                                                  ▼
-                    ┌──────────────────────────────────────────────┐
-                    │ detector/decision.py  (最终裁决)              │
-                    │                                              │
-                    │  输入: 7 个候选评分                            │
-                    │    GBK: 0.82, BIG5: 0.42, UTF8: 0.35, ...   │
-                    │                                              │
-                    │  处理:                                       │
-                    │    softmax 归一化                             │
-                    │    → 内容判别器                              │
-                    │       CJK/Bopomofo/假名 歧义消解              │
-                    │                                              │
-                    │  输出: top_candidates + 置信度                │
-                    │                                              │
-                    │  依赖: encoding.py                           │
-                    │        text_analyzer.py                      │
-                    └──────────────────┬───────────────────────────┘
-                                       │
-                                       ▼
-                     DetectionResult
-                     { encoding:"GBK", std_name:"gbk",
-                       is_pure_ascii:false, trials:[...] }
-                                       │
-                                       ▼
-                     ┌─────────────────────────────────────────────┐
-                     │ ui/tabs.py 显示结果到界面                    │
-                     └─────────────────────────────────────────────┘
+用户点击"打开文件"
+    │
+    ▼
+ui/tabs.py  ──→  services/detector_service.py  ──→  detector/pipeline.py
+ (选文件、调服务)    (diagnose_from_raw)              (FileEncodingDetector)
+                                                          │
+                                               ┌──────────┼──────────┐
+                                               ▼          ▼          ▼
+                                        anchors.py  agents.py  decision.py
+                                        (Layer 1)   (Layer 2)  (Layer 3)
 ```
+
+### 三层流水线
+
+| 层 | 文件 | 职责 | 举例 |
+|---|------|------|------|
+| Layer 1 锚点 | `detector/anchors.py` | 硬规则短路 | BOM(`FF FE`→UTF-16 LE)、纯 ASCII 跳过、UTF-16 null 结构探测 |
+| Layer 2 评分 | `detector/agents.py` | 7 个 Agent 独立打分 | 每个 Agent 返回 `{"GBK": 0.85, ...}` |
+| Layer 3 决策 | `detector/decision.py` | Softmax + 平局裁决 | 差距 < 5% 时用内容判别器消歧 |
 
 ### 检测流程涉及文件
 
-| 步骤 | 文件 | 职责 |
-|---|---|---|
-| 用户操作入口 | `ui/tabs.py` | 弹文件选择框、调服务、更新界面 |
-| 检测门面 | `services/detector_service.py` | 组合读取+检测+结果整理，返回 `DetectionResult` |
-| 检测编排 | `detector/pipeline.py` | 组织 anchors → agents → decision |
-| 硬规则 | `detector/anchors.py` | BOM / 纯 ASCII 短路 / UTF-16 结构判别 |
-| 编码评分 | `detector/agents.py` | 7 个代理各自对 bytes 打分 |
-| 最终裁决 | `detector/decision.py` | softmax + 内容消歧，确定编码 |
-| （被依赖） | `encoding.py` | 编码注册表，检测顺序配置 |
-| （被依赖） | `text_analyzer.py` | char_category / script_score |
-| （被依赖） | `byte_validator.py` | GBK/Big5/SJIS 字节合法性评分 |
-| （被依赖） | `character_token.py` | CharacterToken dataclass |
+| 文件 | 职责 |
+|------|------|
+| `ui/tabs.py` | 文件选择、调服务、更新界面 |
+| `services/detector_service.py` | 封装检测流程，返回 `DetectionResult` |
+| `detector/pipeline.py` | 编排 L1→L2→L3，公开 `FileEncodingDetector` |
+| `detector/anchors.py` | BOM / 纯 ASCII / UTF-16 结构判别 |
+| `detector/agents.py` | 7 个编码评分 Agent |
+| `detector/decision.py` | softmax + 内容消歧 |
+| `detector/byte_validator.py` | GBK/Big5/SJIS 字节格式合规评分 |
+| `detector/text_analyzer.py` | Unicode 字符分类（CJK/假名/注音） |
+| `detector/decode_utils.py` | 统一 `strict_decode` 封装 |
+| `shared/character_token.py` | CharacterToken 数据类 |
+| `encoding.py` | 编码注册表、检测顺序配置 |
 
 ---
 
 ## 二、编码转换流程（UTF-8 → GBK）
 
-用户选择源文件、目标编码 GBK，点击"执行转换"。
+### 调用链
 
 ```
 用户点击"执行转换"
-     │
-     ▼
-┌──────────────────────────────────────────────────────────────┐
-│ ui/tabs.py  (EncodingConverterTab._do_convert)                │
-│  获取源/目标编码、策略，调服务                                  │
-│  不知道 encode/decode 具体怎么实现                              │
-└────────────────────────────────┬─────────────────────────────┘
-                                 │
-                                 ▼
-┌──────────────────────────────────────────────────────────────┐
-│ services/converter_service.py  (转换总管)                     │
-│                              │                                │
-│  1. 读取 file_to_tokens() → CharacterToken[]                 │
-│  2. 兼容性检查 compatibility_scan()                           │
-│  3. 执行转换 convert_file()                                  │
-│  4. 返回 ConversionResult                                    │
-└──────────────┬──────────────────────────────┬────────────────┘
-               │                              │
-               ▼                              ▼
-┌──────────────────────────────┐  ┌──────────────────────────────┐
-│ compatibility.py  (转换前检查) │  │ encoding_converter.py (真正转换)│
-│                              │  │                              │
-│  输入: CharacterToken[]      │  │  Converter.convert_tokens()  │
-│       target_encoding="GBK" │  │                              │
-│                              │  │  遍历每个 token:              │
-│  对每个字符:                  │  │    char.encode("gbk")        │
-│    char.encode("gbk")        │  │    → bytes                  │
-│    成功 → compatible++       │  │                              │
-│    失败 → problems[]         │  │  失败时:                     │
-│                              │  │    replace: "?".encode()     │
-│  返回 CompatibilityReport    │  │    strict: 抛出 ValueError   │
-│    { rate, compatible,       │  │                              │
-│      problem_count, problems }│ │  依赖: encoding.py           │
-│                              │  │        compatibility.py     │
-│  依赖: encoding.py           │  │                              │
-│       character_token.py   │  └──────────────┬───────────────┘
-└──────────────────────────────┘                 │
-                                                  │
-                                                  ▼
-                    ┌──────────────────────────────────────────────┐
-                    │ verifier.py  (转换后验证)                    │
-                    │                                              │
-                    │  ConversionVerifier.verify_roundtrip()       │
-                    │                                              │
-                    │  1. 读取输出文件 bytes                        │
-                    │  2. raw.decode("gbk") → recovered_text       │
-                    │  3. 逐字符比对：                              │
-                    │      原 token.char == recovered_char?         │
-                    │                                              │
-                    │  返回 ConversionVerdict                      │
-                    │    { all_match, match_count, mismatch_count }│
-                    │                                              │
-                    │  依赖: encoding.py                           │
-                    │        display_utils.py                     │
-                    └──────────────────┬───────────────────────────┘
-                                       │
-                                       ▼
-                     ConversionResult
-                     { path, tokens, total_chars,
-                       verified, reversible, all_match }
-                                       │
-                                       ▼
-                     ┌─────────────────────────────────────────────┐
-                     │ ui/tabs.py 显示结果 + 提示框                 │
-                     └─────────────────────────────────────────────┘
+    │
+    ▼
+ui/tabs.py  ──→  services/converter_service.py
+ (选编码、策略)      │
+                    ├── 1. file_to_tokens() → 解码源文件
+                    ├── 2. compatibility_scan() → 预览不可编码字符
+                    ├── 3. convert_file() → 执行转换 + 写文件
+                    └── 4. verifier.verify_roundtrip() → 验证无损
 ```
 
 ### 转换流程涉及文件
 
-| 步骤 | 文件 | 职责 |
-|---|---|---|
-| 用户操作入口 | `ui/tabs.py` | 按钮响应、参数获取、结果展示 |
-| 转换总管 | `services/converter_service.py` | 编排兼容检查→转换→验证 |
-| 兼容检查 | `compatibility.py` | 转换前预览哪些字符不可编码 |
-| 编码转换 | `encoding_converter.py` | 逐字符 encode 输出 bytes + 写文件 |
-| 转换验证 | `verifier.py` | 标准库独立解码比对，验证无损 |
-| （被依赖） | `encoding.py` | 编码映射表 |
-| （被依赖） | `character_token.py` | CharacterToken |
-| （被依赖） | `converter_utils.py` | token_target_display |
-| （被依赖） | `display_utils.py` | bytes_to_hex, codepoint_display |
+| 文件 | 职责 |
+|------|------|
+| `ui/tabs.py` | 参数获取、结果展示 |
+| `services/converter_service.py` | 编排兼容检查→转换→验证 |
+| `converter/compatibility.py` | 转换前预览哪些字符不可编码 |
+| `converter/converter.py` | 逐字符 encode 输出 bytes + 写文件 |
+| `converter/verifier.py` | 标准库独立解码比对 |
+| `converter/converter_utils.py` | `token_target_display` 格式化 |
+| `encoding.py` | 编码映射表 |
 
 ---
 
-## 三、字符 HEX 查看流程（输入"中" → 看到各编码字节）
-
-用户在查看器输入"中"，系统展示"UTF-8: E4 B8 AD / GBK: D6 D0 / Big5: A4 A4"。
+## 三、字符 HEX 查看流程（输入"中"→ 看到各编码字节）
 
 ```
-用户粘贴文本 / 打开文件
-     │
-     ▼
-┌──────────────────────────────────────────────────────────────┐
-│ ui/tabs.py  (EncodingViewerTab._analyze / _open_file)        │
-│  获取 tokens → 调 EncodingViewer → 填表格                     │
-└────────────────────────────────┬─────────────────────────────┘
-                                 │
-                                 ▼
-┌──────────────────────────────────────────────────────────────┐
-│ encoding_viewer.py  (EncodingViewer)                          │
-│                              │                                │
-│  analyze_tokens(tokens)      │                                │
-│    → analyze_token(token)    │                                │
-│      → analyze_character(char, source_bytes)                  │
-│                              │                                │
-│  对每个字符:                  │                                │
-│    遍历 ALL_ENCODINGS:       │                                │
-│      char.encode(std_name)   │                                │
-│      → bytes_to_hex(bytes)   │                                │
-│      成功 → "E4 B8 AD"       │                                │
-│      失败 → "N/A"            │                                │
-│                              │                                │
-│  get_statistics(results)     │                                │
-│    → 各编码支持率统计         │                                │
-│                              │                                │
-│  依赖: encoding.py           │                                │
-│        display_utils.py     │                                │
-│        character_token.py   │                                │
-└────────────────────────────────┬─────────────────────────────┘
-                                 │
-                                 ▼
-                     ┌───────────────────────────────────────────┐
-                     │ ui/tables.py  (ColoredTable.display_data) │
-                     │  逐行绘制 Canvas 表格显示                   │
-                     │  红底 "N/A"、灰底编码色、字体对齐           │
-                     │                                            │
-                     │  依赖: encoding.py (颜色)                  │
-                     │        encoding_viewer.py (列定义)         │
-                     └───────────────────────────────────────────┘
+用户粘贴文本/打开文件
+    │
+    ▼
+ui/tabs.py ──→ viewer/viewer.py ──→ ui/tables.py
+ (获取 tokens)  (EncodingViewer)     (ColoredTable Canvas 表格)
+                   │
+                   ├── 遍历所有编码：char.encode(std_name)
+                   ├── 成功 → bytes_to_hex → "E4 B8 AD"
+                   └── 失败 → "N/A"
+```
+
+### 查看流程涉及文件
+
+| 文件 | 职责 |
+|------|------|
+| `viewer/viewer.py` | `EncodingViewer` 逐字符分析各编码字节表示 |
+| `ui/tables.py` | `ColoredTable` Canvas 像素级表格 |
+| `shared/display_utils.py` | `bytes_to_hex`, `codepoint_display` |
+| `encoding.py` | 编码列表、颜色映射 |
+
+---
+
+## 四、核心评分机制：byte_validator + text_analyzer
+
+两把"尺子"配合 `agents.py` 中的 Agent 做综合评判：
+
+| 尺子 | 看什么 | 输入 | 输出 | 核心问题 |
+|------|--------|------|------|---------|
+| `byte_validator` | **原始字节的编码值**（不关心含义） | `bytes` | 0.0~1.0 格式合规分 | "字节结构像不像 GBK？" |
+| `text_analyzer` | **解码后的 Unicode 码点** | `str` | `{cjk_ratio, kana_ratio, ...}` | "解码后是中文、日文还是注音？" |
+
+**为什么需要两层？** 字节范围高度重叠（如 `0xD6 0xD0` 在 GBK 和 Big5 中都合法），只有结合解码后的语言特征才能区分。
+
+**byte_validator 示例：**
+```python
+score_gbk(b'\xD6\xD0\xB9\xFA')  → 1.0   # 全部字节符合 GBK 格式
+score_big5(同一段字节)             → 0.0   # 前导字节不在 Big5 范围内
+```
+**text_analyzer 示例：**
+```python
+analyze_text("中国")     → cjk_ratio=1.0,   kana_ratio=0.0, bopomofo=0.0
+analyze_text("こんにちは") → cjk_ratio=0.0,   kana_ratio=1.0
+analyze_text("ㄅㄆㄇㄈ")   → cjk_ratio=0.0,   bopomofo_ratio=1.0
 ```
 
 ---
 
-## 四、功能 ↔ 文件对应表
+## 五、7 个评分 Agent
 
-| 功能 | 主要文件 |
-|---|---|
-| 打开文件、按钮交互 | `ui/tabs.py` |
-| 编码检测流水线 | `detector/anchors.py`, `agents.py`, `decision.py`, `pipeline.py` |
-| 检测业务门面 | `services/detector_service.py` |
-| 字符 Token | `character_token.py` |
-| 编码注册、颜色 | `encoding.py` |
-| 编码转换 | `encoding_converter.py` |
-| 转换业务门面 | `services/converter_service.py` |
-| 兼容性检查 | `compatibility.py` |
-| 转换验证 | `verifier.py` |
-| 字符 HEX 查看 | `encoding_viewer.py` |
-| 字节校验评分 | `byte_validator.py` |
-| 文本分析 | `text_analyzer.py` |
-| 解码 | `decode_utils.py` |
-| 格式工具 | `display_utils.py` |
-| Token 显示格式化 | `converter_utils.py` |
-| Canvas 表格 | `ui/tables.py` |
-| 图例 / 按钮工厂 | `ui/widgets.py` |
-| 主窗口 | `ui/app.py` |
+定义在 `detector/agents.py`，每个 Agent 融合 `byte_validator` 的格式分和 `text_analyzer` 的语言特征分：
 
----
+| Agent | 评分公式 | 关键区分信号 |
+|-------|---------|-------------|
+| **UTF-8** | 严格解码 + ASCII 稀释上限 0.5 | 纯 ASCII 不给高分 |
+| **GBK** | byte×0.4 + cjk×0.3 + script×0.3 | 汉字权重高，含假名惩罚 |
+| **Big5** | byte×0.4 + cjk×0.2 + script×0.2 + **bopomofo×0.2** | 注音符号是 Big5 独有 |
+| **Shift-JIS** | byte×0.4 + **kana×0.4** + cjk×0.2 | 假名权重最高 |
+| **UTF-16 LE** | null 结构分 + 文本质量 | 奇数位 null 密集 |
+| **UTF-16 BE** | null 结构分 + 文本质量 | 偶数位 null 密集 |
+| **Extended ASCII** | 固定低分兜底 | ASCII > 95% 给 0.2，否则 0.02 |
 
-## 五、所以文件很多，但一次操作不会经过全部
-
-18 个 .py 文件，但每条路径只走其中一部分：
-
-**检测 GBK 文件：** `tabs.py` → `detector_service.py` → `pipeline.py` → `agents.py` → `decision.py` → `encoding.py`
-
-**转换 UTF-8 → GBK：** `tabs.py` → `converter_service.py` → `compatibility.py` → `encoding_converter.py` → `verifier.py` → `encoding.py`
-
-**查看字符 HEX：** `tabs.py` → `encoding_viewer.py` → `display_utils.py` → `tables.py`
+7 个分数汇总到 `detector/decision.py`，经 softmax 归一化 + 稳定性规则 + 平局裁决后输出最终编码。
 
 ---
 
@@ -309,186 +211,45 @@ python -m unittest discover -s tests -p "test_*.py" -v
 ```
 src/
 ├── main.py                    程序入口
-├── gui.py                     ← ui/app.py:MainWindow（向后兼容存根）
-├── file_detector.py           ← detector/*（向后兼容存根）
 │
-├── detector/                  检测引擎子包
+├── detector/                  检测引擎
 │   ├── anchors.py             BOM / 纯 ASCII / UTF-16 结构锚点
-│   ├── agents.py              7 个编码检测代理评分
-│   ├── decision.py            softmax + 内容判别器
-│   └── pipeline.py            FileEncodingDetector 管线
+│   ├── agents.py              7 个编码评分 Agent
+│   ├── decision.py            softmax + 内容消歧
+│   ├── pipeline.py            FileEncodingDetector 流水线
+│   ├── byte_validator.py      GBK/Big5/SJIS 字节格式评分
+│   ├── text_analyzer.py       Unicode 字符分类统计
+│   └── decode_utils.py        strict_decode 封装
 │
-├── services/                  业务门面层（GUI 唯一入口）
-│   ├── result.py              DetectionResult / ConversionResult / CompatibilitySummary
-│   ├── detector_service.py    检测服务
-│   └── converter_service.py   转换服务
+├── converter/                 编码转换引擎
+│   ├── converter.py           逐字符 encode + 写文件
+│   ├── verifier.py            标准库独立验证往返一致性
+│   ├── compatibility.py       转换前不可编码字符预览
+│   └── converter_utils.py     token_target_display
 │
-├── ui/                        UI 子包
+├── viewer/                    编码查看引擎
+│   └── viewer.py              EncodingViewer 逐字符分析
+│
+├── shared/                    跨领域共享
+│   ├── character_token.py     CharacterToken 数据类
+│   └── display_utils.py       bytes_to_hex / codepoint_display
+│
+├── services/                  Facade 层（GUI 唯一入口）
+│   ├── result.py              DetectionResult / ConversionResult
+│   ├── detector_service.py    检测服务封装
+│   └── converter_service.py   转换服务封装
+│
+├── ui/                        Tkinter 界面层
 │   ├── app.py                 MainWindow
-│   ├── tabs.py                EncodingViewerTab / EncodingConverterTab
+│   ├── tabs.py                查看器 + 转换器两个标签页
 │   ├── tables.py              ColoredTable / ConversionResultTable
-│   └── widgets.py             ColorLegend / 按钮 / 分隔线工厂
+│   └── widgets.py             ColorLegend / 按钮工厂
 │
 ├── encoding.py                编码注册中心（唯一数据源）
-├── display_utils.py           bytes_to_hex / codepoint_display
-├── character_token.py         CharacterToken dataclass
-├── encoding_viewer.py         EncodingViewer 逐字符编码分析
-├── encoding_converter.py      Converter 编码转换逻辑
-├── converter_utils.py         token_target_display
-├── compatibility.py           CompatibilityReport + 兼容扫描
-├── verifier.py                ConversionVerifier 往返验证
-├── byte_validator.py          GBK/Big5/SJIS 字节校验评分
-├── decode_utils.py            strict_decode
-├── text_analyzer.py           char_category / text_script_score
-│
 ├── logs/
 └── output/converted/
 ```
 
 ## 演示数据集
 
-`demo_chars/` 目录包含 11 个编码文件（含 ASCII / UTF-8 / UTF-16 LE/BE / GBK / Big5 / Shift-JIS），用于演示检测与转换功能。详情见 `demo_chars/README.txt`。
-
-## 分层依赖
-
-```
-        UI (ui/app.py → tabs.py → tables.py → widgets.py)
-                         ↓
-               Services (detector_service, converter_service)
-                    ↙           ↘
-        Detector (pipeline)    Converter/Viewer/Verifier
-               ↙                ↙    ↘
-       Core (encoding, display_utils, character_token, byte_validator, text_analyzer, ...)
-```
-
----
-
-## 代码架构与调用逻辑
-
-### 分层架构全景
-
-```
-                    ┌─────────────────┐
-                    │    main.py      │  ← 入口
-                    │  └─ gui.py*     │  ← 兼容存根
-                    │  └─ file_detector.py* │
-                    └────────┬────────┘
-                             │
-                    ┌────────▼────────┐
-                    │  ui/  (界面层)   │
-                    │  app.py         │  ← 主窗口
-                    │  tabs.py        │  ← 两个标签页
-                    │  tables.py      │  ← Canvas 表格
-                    │  widgets.py     │  ← 图例/按钮工厂
-                    └────────┬────────┘
-                             │
-                    ┌────────▼────────┐
-                    │  services/       │  ← Facade 层
-                    │  detector_service│     GUI 唯一入口
-                    │  converter_service│
-                    │  result.py      │  ← 公共数据类型
-                    └────┬────┬───────┘
-                         │    │
-              ┌──────────▼┐  ┌▼──────────────────┐
-              │ detector/ │  │ encoding_converter │
-              │ pipeline  │  │ encoding_viewer    │
-              │ anchors   │  │ compatibility      │
-              │ agents    │  │ verifier           │
-              │ decision  │  │ converter_utils    │
-              └──────────┬┘  └┬───────────────────┘
-                         │    │
-              ┌──────────▼────▼──────────────────┐
-              │     Core（核心层）                 │
-              │  encoding.py      ← 编码注册中心   │
-              │  character_token  ← Token 数据类   │
-              │  byte_validator   ← 字节校验评分    │
-              │  text_analyzer    ← Unicode 分析   │
-              │  decode_utils     ← 统一解码        │
-              │  display_utils    ← HEX/码点格式化   │
-              └───────────────────────────────────┘
-```
-
-### 全部文件职责清单
-
-#### 入口与兼容存根
-
-| 文件 | 角色 | 核心函数/类 | 被谁调用 | 依赖 |
-|------|------|------------|---------|------|
-| `main.py` | 程序入口 | `main()` | `python main.py` | `gui.py` |
-| `gui.py` | 向后兼容存根 | `MainWindow`（re-export） | `main.py` | `ui/app.py` |
-| `file_detector.py` | 向后兼容存根 | `FileEncodingDetector`（re-export） | 旧代码兼容 | `detector/pipeline.py` |
-
-#### Core 层（被依赖，无业务逻辑）
-
-| 文件 | 角色 | 核心函数/类 | 被谁调用 | 依赖 |
-|------|------|------------|---------|------|
-| `encoding.py` | **编码注册中心** — 唯一定义所有编码的显示名、标准名、颜色、检测/查看/转换映射 | `Encoding` dataclass, `ALL_ENCODINGS`, `DETECTION_ORDER`, `VIEWER_ENCODING_MAP`, `CONVERTER_ENCODING_MAP` | **所有上层模块** | 无 |
-| `character_token.py` | **字符令牌** — 记录字符、来源编码、原始字节、目标编码 | `CharacterToken` dataclass | `pipeline.py`, `encoding_viewer.py`, `encoding_converter.py`, `converter_utils.py`, `tables.py` | `display_utils.py` |
-| `display_utils.py` | **格式化工具** — 字节→HEX、字符→U+XXXX | `bytes_to_hex()`, `codepoint_display()` | `character_token.py`, `encoding_viewer.py`, `verifier.py`, `tables.py` | 无 |
-| `decode_utils.py` | **统一解码** — 封装 try/except 解码 | `strict_decode()` | `agents.py` | 无 |
-| `text_analyzer.py` | **Unicode 文本分析** — 字符分类+cjk/假名/注音比例+加权评分 | `char_category()`, `analyze_text()`, `text_script_score()` | `agents.py`, `decision.py` | 无 |
-| `byte_validator.py` | **字节合法性评分** — 逐字节统计合法多字节序列占比 | `score_multibyte_validity()`, `score_gbk/score_big5/score_sjis` | `agents.py` | 无 |
-
-#### Detector 层（编码检测引擎）
-
-| 文件 | 角色 | 核心函数/类 | 被谁调用 | 依赖 |
-|------|------|------------|---------|------|
-| `detector/anchors.py` | **硬规则锚点** — BOM / 纯 ASCII / UTF-16 结构 | `_bom_anchor()`, `_is_pure_ascii_bytes()`, `_utf16_structural_anchor()` | `pipeline.py`（Layer 1） | 无 |
-| `detector/agents.py` | **编码评分代理** — 7 个 agent 各自打分 | `_run_agents()`, `_utf8_agent`, `EncodingDetectionAgent`(GBK/Big5/SJIS), `_utf16le_agent`, `_utf16be_agent`, `_extended_ascii_agent` | `pipeline.py`（Layer 2） | `byte_validator.py`, `decode_utils.py`, `text_analyzer.py`, `encoding.py` |
-| `detector/decision.py` | **最终决策** — softmax + 内容消歧 | `_content_discriminator()`, `_softmax(values, temp=10.0)` | `pipeline.py`（Layer 3） | `encoding.py`, `text_analyzer.py` |
-| `detector/pipeline.py` | **检测流水线编排** — L1→L2→L3 + 公开 API | `detect_with_full_decision()`, `FileEncodingDetector`(detect_file/detect_bytes/diagnose_detect/file_to_tokens/charset_detect) | `services/detector_service.py` | `anchors.py`, `agents.py`, `decision.py`, `encoding.py`, `character_token.py` |
-
-#### Converter / Viewer / Verifier（转换与查看核心逻辑）
-
-| 文件 | 角色 | 核心函数/类 | 被谁调用 | 依赖 |
-|------|------|------------|---------|------|
-| `encoding_converter.py` | **编码转换器** — 逐字符 encode + 写文件 | `Converter._encode()`, `convert_file()` | `services/converter_service.py` | `encoding.py`, `compatibility.py`, `verifier.py` |
-| `encoding_viewer.py` | **编码查看器** — 逐字符分析各编码字节表示 | `EncodingViewer.analyze_tokens()`, `get_statistics()` | `ui/tabs.py` | `encoding.py`, `display_utils.py` |
-| `compatibility.py` | **转换前兼容扫描** — 预览不可编码字符 | `compatibility_scan()`, `get_s2t_translator()` | `services/converter_service.py` | `encoding.py` |
-| `verifier.py` | **转换后验证** — 标准库独立解码比对 | `ConversionVerifier.verify_roundtrip()` | `encoding_converter.py` | `encoding.py`, `display_utils.py` |
-| `converter_utils.py` | **Token 显示格式化** | `token_target_display()` | `ui/tables.py` | `encoding.py` |
-
-#### Services 层（GUI 的 Facade 入口）
-
-| 文件 | 角色 | 核心函数/类 | 被谁调用 | 依赖 |
-|------|------|------------|---------|------|
-| `services/result.py` | **公共数据类型** — 服务层结果封装 | `DetectionResult`, `CompatibilitySummary`, `ConversionResult` | `detector_service.py`, `converter_service.py`, `ui/tabs.py` | 无 |
-| `services/detector_service.py` | **检测服务门面** — 封装 FileEncodingDetector | `diagnose_from_raw()`, `file_to_tokens()`, `detect_bytes()`, `charset_detect()` | `ui/tabs.py` | `detector/pipeline.py`, `services/result.py` |
-| `services/converter_service.py` | **转换服务门面** — 封装 Converter/compatibility/verifier | `compatibility_scan()`, `convert_file()`, `supported_encodings`, `error_strategies` | `ui/tabs.py` | `encoding_converter.py`, `compatibility.py`, `services/result.py` |
-
-#### UI 层（界面交互）
-
-| 文件 | 角色 | 核心函数/类 | 被谁调用 | 依赖 |
-|------|------|------------|---------|------|
-| `ui/app.py` | **主窗口** — Tk + Notebook + 两个标签页 | `MainWindow` | `gui.py` | `ui/tabs.py` |
-| `ui/tabs.py` | **两个功能标签页** — 编码查看器 & 编码转换器 | `EncodingViewerTab`(_open_file/_analyze), `EncodingConverterTab`(_sel_file/_do_convert) | `ui/app.py` | `services/*`, `encoding_viewer.py`, `ui/tables.py`, `ui/widgets.py` |
-| `ui/tables.py` | **Canvas 绘制表格** — 编码兼容表 + 转换结果表 | `ColoredTable`, `ConversionResultTable` | `ui/tabs.py` | `encoding.py`, `display_utils.py`, `converter_utils.py` |
-| `ui/widgets.py` | **UI 组件工厂** — 按钮/图例/分隔线 | `create_button()`, `ColorLegend` | `ui/tabs.py` | 无 |
-
-### 三条核心数据流路径
-
-```
-🔍 检测路径：
-   main.py → app.py → viewer_tab._open_file()
-   → detector_service.diagnose_from_raw()
-   → pipeline.detect_with_full_decision()
-     → anchors (BOM / ASCII / UTF-16)
-     → agents (7 个编码评分)
-     → decision (softmax + 内容消歧)
-   → encoding.py (查编码映射表)
-   → tabs.py 更新界面
-
-🔄 转换路径：
-   main.py → app.py → converter_tab._do_convert()
-   → converter_service.compatibility_scan() → compatibility.py
-   → converter_service.convert_file() → encoding_converter.encode()
-   → verifier.verify_roundtrip() 验证无损
-   → tabs.py 显示结果
-
-📊 查看路径：
-   main.py → app.py → viewer_tab._analyze()
-   → encoding_viewer.analyze_tokens()
-     → 遍历 ALL_ENCODINGS, 尝试 char.encode(std_name)
-   → display_utils.bytes_to_hex()
-   → tables.py ColoredTable 渲染
-```
+`demo_chars/` 包含 11 个编码文件（ASCII / UTF-8 / UTF-16 LE/BE / GBK / Big5 / Shift-JIS 等），用于演示检测与转换功能。详情见 `demo_chars/README.txt`。

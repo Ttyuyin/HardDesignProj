@@ -10,7 +10,7 @@ import math
 from collections import Counter
 
 from encoding import resolve_std_name
-from text_analyzer import char_category
+from detector.text_analyzer import char_category
 
 from .agents import _ALL_AGENTS
 

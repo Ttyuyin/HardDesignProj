@@ -5,7 +5,7 @@
 兼容性扫描相关逻辑移至 compatibility.py。
 """
 
-from display_utils import bytes_to_hex
+from shared.display_utils import bytes_to_hex
 from encoding import get_std_name
 
 

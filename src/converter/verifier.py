@@ -10,7 +10,7 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
-from display_utils import codepoint_display
+from shared.display_utils import codepoint_display
 from encoding import get_std_name
 
 

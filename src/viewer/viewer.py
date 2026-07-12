@@ -6,7 +6,7 @@
 
 import unicodedata
 
-from display_utils import bytes_to_hex, codepoint_display
+from shared.display_utils import bytes_to_hex, codepoint_display
 from encoding import ENCODING_NAMES, VIEWER_ENCODING_MAP
 
 

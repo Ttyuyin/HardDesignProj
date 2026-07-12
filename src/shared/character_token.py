@@ -6,7 +6,7 @@
 
 from dataclasses import dataclass
 
-from display_utils import bytes_to_hex, codepoint_display
+from shared.display_utils import bytes_to_hex, codepoint_display
 
 
 @dataclass

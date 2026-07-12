@@ -6,8 +6,8 @@ GUI 不应直接导入 encoding_converter 或 compatibility 模块。
 本模块负责将内部原始类型（raw dict、内部 Report 对象）转换为服务层公开类型。
 """
 
-from compatibility import compatibility_scan as _compat_scan
-from encoding_converter import Converter, convert_file as _convert_file
+from converter.compatibility import compatibility_scan as _compat_scan
+from converter.converter import Converter, convert_file as _convert_file
 from services.result import CompatibilitySummary, ConversionResult
 
 

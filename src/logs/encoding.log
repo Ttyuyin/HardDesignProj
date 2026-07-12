@@ -68,3 +68,27 @@
 2026-07-10 16:16:56 | INFO    | encoding_converter | Conversion successful: french_chars.txt -> french_chars_utf8_to_big5.txt (Big5) (verified: not reversible)
 2026-07-10 16:17:12 | INFO    | encoding_converter | Conversion successful: french_chars.txt -> french_chars_utf8_to_gbk.txt (GBK) (verified: not reversible)
 2026-07-10 16:17:46 | INFO    | root | 系统正常退出
+2026-07-10 20:34:01 | INFO    | root | ==================================================
+2026-07-10 20:34:01 | INFO    | root | 字符编码显示与转换系统启动
+2026-07-10 20:34:01 | INFO    | root | 日志文件: d:\code\HardDesignProj\src\logs\encoding.log
+2026-07-10 20:34:01 | INFO    | root | ==================================================
+2026-07-12 10:22:16 | INFO    | root | ==================================================
+2026-07-12 10:22:16 | INFO    | root | 字符编码显示与转换系统启动
+2026-07-12 10:22:16 | INFO    | root | 日志文件: d:\code\HardDesignProj\src\logs\encoding.log
+2026-07-12 10:22:16 | INFO    | root | ==================================================
+2026-07-12 10:22:40 | INFO    | encoding_converter | Conversion successful: korean_chars.txt -> korean_chars_utf8_to_utf16.txt (UTF-16) (verified: not reversible)
+2026-07-12 10:22:58 | INFO    | root | 系统正常退出
+2026-07-12 21:23:07 | INFO    | root | ==================================================
+2026-07-12 21:23:07 | INFO    | root | 字符编码显示与转换系统启动
+2026-07-12 21:23:07 | INFO    | root | 日志文件: d:\code\HardDesignProj\src\logs\encoding.log
+2026-07-12 21:23:07 | INFO    | root | ==================================================
+2026-07-12 21:24:00 | INFO    | encoding_converter | Conversion successful: gbk.txt -> gbk_utf8_to_gbk.txt (GBK) (verified: reversible)
+2026-07-12 21:28:34 | INFO    | encoding_converter | Conversion successful: gbk.txt -> gbk_utf8_to_gbk.txt (GBK) (verified: reversible)
+2026-07-12 21:30:35 | INFO    | encoding_converter | Conversion successful: gbk长.txt -> gbk长_utf8_to_gbk.txt (GBK) (verified: reversible)
+2026-07-12 21:30:43 | INFO    | encoding_converter | Conversion successful: gbk短.txt -> gbk短_utf8_to_gbk.txt (GBK) (verified: reversible)
+2026-07-12 21:31:07 | INFO    | encoding_converter | Conversion successful: gbk短_utf8_to_gbk.txt -> gbk短_utf8_to_gbk_gbk_to_big5.txt (Big5) (verified: not reversible)
+2026-07-12 21:31:26 | INFO    | encoding_converter | Conversion successful: gbk长_utf8_to_gbk.txt -> gbk长_utf8_to_gbk_gbk_to_big5.txt (Big5) (verified: not reversible)
+2026-07-12 21:59:55 | INFO    | root | ==================================================
+2026-07-12 21:59:55 | INFO    | root | 字符编码显示与转换系统启动
+2026-07-12 21:59:55 | INFO    | root | 日志文件: d:\code\HardDesignProj\src\logs\encoding.log
+2026-07-12 21:59:55 | INFO    | root | ==================================================

@@ -23,7 +23,7 @@ import logging
 # 确保能导入同级模块
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from gui import MainWindow
+from ui.app import MainWindow
 
 
 def setup_logging():

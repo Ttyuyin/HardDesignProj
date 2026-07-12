@@ -8,7 +8,7 @@ Layer 1（锚点检测）→ Layer 2（Agent 评分）→ Layer 3（决策引擎
 import logging
 from pathlib import Path
 
-from character_token import CharacterToken
+from shared.character_token import CharacterToken
 from encoding import DETECTION_ORDER, resolve_std_name
 
 from .anchors import _bom_anchor, _is_pure_ascii_bytes, _utf16_structural_anchor

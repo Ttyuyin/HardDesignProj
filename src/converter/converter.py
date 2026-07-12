@@ -8,9 +8,9 @@
 from pathlib import Path
 import logging
 
-from compatibility import get_s2t_translator
+from converter.compatibility import get_s2t_translator
 from encoding import CONVERTER_ENCODING_MAP
-from verifier import ConversionVerifier
+from converter.verifier import ConversionVerifier
 
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ class Converter:
         "Strict": "strict",           # 严格报错：遇到不可编码字符立即抛出异常
     }
 
-    DEFAULT_OUTPUT_DIR = Path(__file__).parent / "output" / "converted"
+    DEFAULT_OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output" / "converted"
 
     @staticmethod
     def _safe_name(name):
