@@ -20,7 +20,7 @@ def _utf8_agent(raw_data: bytes) -> dict[str, float]:
     控制字符过多时会进一步扣分，避免二进制数据被误判为文本。
     """
     try:
-        raw_data.decode("utf-8", errors="strict")
+        text = raw_data.decode("utf-8", errors="strict")
     except UnicodeDecodeError:
         return {"UTF-8": 0.0}
 
@@ -30,7 +30,6 @@ def _utf8_agent(raw_data: bytes) -> dict[str, float]:
         return {"UTF-8": 0.5}
 
     score = 0.95
-    text = raw_data.decode("utf-8")
     ctrl_count = sum(1 for ch in text if char_category(ord(ch)) == "control")
     # 控制字符惩罚：按比例线性扣减，上限 0.15
     ctrl_penalty = min(0.15, ctrl_count * 3 / max(1, len(text)))

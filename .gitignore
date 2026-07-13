@@ -1,0 +1,31 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Test artifacts (whole directories)
+docs/test_reports/part*
+docs/test_reports/conversion_log.txt
+docs/test_reports/conversion_matrix.md
+docs/test_reports/software_functional_test.md
+docs/test_reports/converted/
+docs/test_reports/conv_output/
+docs/test_reports/matrix_output/
+
+# Output
+output/converted/
+src/output/converted/
