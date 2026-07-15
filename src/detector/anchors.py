@@ -1,56 +1,57 @@
-"""
-Layer 1: Anchor Detector（硬规则锚点检测）
-
-BOM 检测、纯 ASCII 快速判定、UTF-16 结构启发式判定。
-作为三级流水线的第一层，提供无需统计分析即可确定的编码证据。
-"""
+"""Layer 1: Anchor Detector —— 提供确定性事实和弱hint，不做最终判定"""
 
 
-def _bom_anchor(raw_data: bytes) -> tuple[str, str] | None:
-    """检查字节序标记（BOM），返回 (显示名称, 标准名称) 或 None。
+def run_anchors(raw_data: bytes) -> dict:
+    """收集所有锚点证据（BOM、ASCII、UTF-16 结构提示）"""
+    bom_result = _bom_anchor(raw_data)
+    is_ascii = _is_pure_ascii_bytes(raw_data)
+    utf16 = _utf16_structural_anchor(raw_data)
 
-    BOM 是文件开头的特殊字节序列，用于标识编码方式和字节序。
-    - UTF-8    BOM: EF BB BF
-    - UTF-16 LE BOM: FF FE
-    - UTF-16 BE BOM: FE FF
-    """
+    result = {
+        "bom": bom_result,
+        "is_ascii": is_ascii,
+        "ascii_char_count": len(raw_data),
+        "utf16_hint": {
+            "endian": utf16["endian"],
+            "ratio": utf16["ratio"],
+            "hint_strength": utf16["hint_strength"],
+        },
+    }
+    return result
+
+
+def _bom_anchor(raw_data: bytes) -> dict | None:
+    """检测 BOM 签名（UTF-8/UTF-16 LE/BE）"""
     if raw_data[:3] == b"\xef\xbb\xbf":
-        return ("UTF-8", "utf-8-sig")        # UTF-8 with BOM（含签名）
+        return {"encoding": "UTF-8", "std_name": "utf-8-sig", "confidence": 1.0}
     if raw_data[:2] == b"\xff\xfe":
-        return ("UTF-16 LE", "utf-16")        # UTF-16 小端序
+        return {"encoding": "UTF-16 LE", "std_name": "utf-16", "confidence": 1.0}
     if raw_data[:2] == b"\xfe\xff":
-        return ("UTF-16 BE", "utf-16")        # UTF-16 大端序
+        return {"encoding": "UTF-16 BE", "std_name": "utf-16", "confidence": 1.0}
     return None
 
 
 def _is_pure_ascii_bytes(raw_data: bytes) -> bool:
-    """判断是否为纯 ASCII 字节（所有字节 < 128）。
-
-    纯 ASCII 文件无需进入后续 CJK 编码分析，可直接短路返回。
-    """
+    """判断所有字节是否均为 ASCII（< 0x80）"""
     return all(b < 128 for b in raw_data)
 
 
-def _utf16_structural_anchor(raw_data: bytes) -> str | None:
-    """通过 null 字节分布比率判断 UTF-16 字节序。
+def _utf16_structural_anchor(raw_data: bytes) -> dict:
+    """通过 null 字节分布比率推断 UTF-16 字节序"""
+    if len(raw_data) < 2:
+        return {"endian": None, "ratio": 0.0, "hint_strength": 0.0}
 
-    核心逻辑：UTF-16 中每个码元为 2 字节，ASCII 字符的高位字节通常为 0x00。
-    若偶数位（BE 编码的数据位）或奇数位（LE 编码的数据位）的 0x00 比例 > 25%，
-    则判定为对应字节序。
-    """
-    length = len(raw_data)
-    if length < 2:
-        return None
-    usable_len = length - 1 if length % 2 != 0 else length  # 截断奇数长度
-    half = usable_len // 2                                   # UTF-16 码元数量
+    usable_len = len(raw_data) - 1 if len(raw_data) % 2 != 0 else len(raw_data)
+    half = usable_len // 2
     even_nulls = sum(1 for i in range(0, usable_len, 2) if raw_data[i] == 0)
     odd_nulls = sum(1 for i in range(1, usable_len, 2) if raw_data[i] == 0)
     even_ratio = even_nulls / half
     odd_ratio = odd_nulls / half
-    # 偶数位 0x00 密集 => 大端序（数据在高字节）
+
     if even_ratio > 0.25:
-        return "BE"
-    # 奇数位 0x00 密集 => 小端序（数据在低字节）
+        hint_strength = min(1.0, even_ratio * 1.5)
+        return {"endian": "BE", "ratio": even_ratio, "hint_strength": hint_strength}
     if odd_ratio > 0.25:
-        return "LE"
-    return None
+        hint_strength = min(1.0, odd_ratio * 1.5)
+        return {"endian": "LE", "ratio": odd_ratio, "hint_strength": hint_strength}
+    return {"endian": None, "ratio": 0.0, "hint_strength": 0.0}

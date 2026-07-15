@@ -1,7 +1,4 @@
-"""
-标签页模块 —— EncodingViewerTab（编码查看器）和 EncodingConverterTab（编码转换器）。
-包含文件选择、编码检测、转换设置、结果展示等完整交互逻辑。
-"""
+"""标签页模块 —— 编码查看器和编码转换器"""
 
 import logging
 import os
@@ -35,25 +32,15 @@ CONVERT_DIR = Path(__file__).parent.parent / "output" / "converted"
 DEFAULT_STATUS = f"就绪   |   {CHARS_DIR}"
 
 
-# ---------------------------------------------------------------------------
-# 共享检测管线 —— 供两个标签页共用
-# ---------------------------------------------------------------------------
 def _detect_file_info(file_path):
-    """读取文件一次，返回原始字节、检测结果对象及 charset-normalizer 辅助信息。
-
-    返回 (raw_data, DetectionResult, csn_part)，其中 csn_part 为可读的检测标签字符串。
-    """
+    """读取文件并执行编码检测"""
     raw_data = Path(file_path).read_bytes()
     raw_data, result, csn_part = _detect_from_raw(raw_data, file_path)
     return raw_data, result, csn_part
 
 
 def _detect_from_raw(raw_data, file_path):
-    """对已载入的字节数据进行编码检测 —— 避免重复读取磁盘。
-
-    同时调用 diagnose_from_raw（内部多引擎）和 charset-normalizer，
-    将后者结果格式化为 "charset-normalizer: encoding (confidence%)" 的可读片段。
-    """
+    """对原始字节执行内部检测 + charset-normalizer 交叉参考"""
     result = diagnose_from_raw(raw_data, file_path)
     csn_r = charset_detect(raw_data)
     csn_part = f"charset-normalizer: {csn_r['encoding'] or 'N/A'}"
@@ -62,26 +49,18 @@ def _detect_from_raw(raw_data, file_path):
     return raw_data, result, csn_part
 
 
-# ---------------------------------------------------------------------------
-# EncodingConverterTab —— 编码转换器标签页
-# ---------------------------------------------------------------------------
 class EncodingConverterTab(tk.Frame):
-    """编码转换器标签页。提供文件选择、源/目标编码选择、兼容性预览及实际转换功能。"""
 
     def __init__(self, parent, **kwargs):
+        """初始化转换器标签页"""
         super().__init__(parent, **kwargs)
-        self.selected_file = None     # 当前选中的源文件路径（Path 对象）
-        self.conv_tokens = []         # 转换后生成的 CharacterToken 列表
-        self._last_dir = ""           # 上次打开文件的目录，用于对话框初始路径
+        self.selected_file = None
+        self.conv_tokens = []
+        self._last_dir = ""
         self._setup_ui()
 
     def _setup_ui(self):
-        """构建转换器标签页的完整 UI 布局。
-
-        自上而下分为四区：文件选择 → 转换设置（源/目标编码 + 错误策略）
-        → 操作按钮 & 信息栏 → 转换结果表格。
-        """
-        # -- 文件选择区域 --
+        """构建转换器标签页 UI"""
         frm_file = ttk.LabelFrame(self, text="文件选择", padding=(8, 6))
         frm_file.pack(fill="x", padx=8, pady=(8, 3))
 
@@ -93,7 +72,6 @@ class EncodingConverterTab(tk.Frame):
         self.file_lbl = tk.Label(row_f, text="未选择文件", font=("Microsoft YaHei", 9), fg="#888")
         self.file_lbl.pack(side="left", padx=10)
 
-        # -- 转换设置区域（源编码 → 目标编码 + 错误处理策略） --
         frm_enc = ttk.LabelFrame(self, text="转换设置", padding=(8, 6))
         frm_enc.pack(fill="x", padx=8, pady=3)
         row_e = tk.Frame(frm_enc)
@@ -103,7 +81,7 @@ class EncodingConverterTab(tk.Frame):
         tk.Label(row_e, text="源编码：", font=("Microsoft YaHei", 9)).pack(side="left", padx=3)
         self.src_cb = ttk.Combobox(row_e, values=enc_names, state="readonly", width=18)
         self.src_cb.pack(side="left", padx=3)
-        self.src_cb.current(0)         # 默认选中第一个编码
+        self.src_cb.current(0)
 
         tk.Label(row_e, text="→", font=("Microsoft YaHei", 14)).pack(side="left", padx=8)
 
@@ -116,9 +94,8 @@ class EncodingConverterTab(tk.Frame):
         err_names = list(error_strategies.keys())
         self.err_cb = ttk.Combobox(row_e, values=err_names, state="readonly", width=18)
         self.err_cb.pack(side="left", padx=3)
-        self.err_cb.current(0)         # 默认 strict 模式
+        self.err_cb.current(0)
 
-        # -- 操作按钮（执行转换 / 打开输出目录 / 清空结果） --
         frm_btn = tk.Frame(self)
         frm_btn.pack(fill="x", padx=8, pady=4)
         tk.Button(frm_btn, text="执行转换", command=self._do_convert,
@@ -128,12 +105,10 @@ class EncodingConverterTab(tk.Frame):
         tk.Button(frm_btn, text="清空结果", command=self._clear_results,
                   font=("Microsoft YaHei", 9)).pack(side="left", padx=3)
 
-        # -- 文件信息状态栏（凹陷样式，显示编码检测信息） --
         self.file_info_lbl = tk.Label(self, text="", anchor="w", font=("Microsoft YaHei", 9),
                                        fg="#555", bg="#F2F2F2", relief="sunken")
         self.file_info_lbl.pack(fill="x", padx=8)
 
-        # -- 转换结果表格 --
         frm_result = ttk.LabelFrame(self, text="转换结果", padding=8)
         frm_result.pack(fill="both", expand=True, padx=8, pady=(3, 2))
         frm_result.grid_rowconfigure(1, weight=1)
@@ -142,14 +117,11 @@ class EncodingConverterTab(tk.Frame):
         self.result_table.grid(row=1, column=0, sticky="nsew")
 
     def _set_file_status(self, parts):
-        """用  |  拼接信息片段，更新文件信息状态栏。"""
+        """更新状态栏显示"""
         self.file_info_lbl.configure(text="  |  ".join(parts))
 
     def _sel_file(self, file_path=None):
-        """弹出文件选择对话框（或接收外部传入路径），加载文件并自动检测编码。
-
-        检测成功后自动将源编码下拉框切换为匹配项，更新状态栏显示检测结果。
-        """
+        """选择待转换的源文件并检测其编码"""
         if file_path is None:
             p = filedialog.askopenfilename(initialdir=self._last_dir or None,
                                            filetypes=[("文本文件", "*.txt"), ("所有文件", "*.*")])
@@ -165,7 +137,6 @@ class EncodingConverterTab(tk.Frame):
         try:
             _, result, csn_part = _detect_file_info(p)
 
-            # 自动匹配检测到的编码，设置源编码下拉框
             enc_name_lower = result.encoding.lower()
             for i, k in enumerate(supported_encodings):
                 if k.lower() == enc_name_lower:
@@ -178,26 +149,17 @@ class EncodingConverterTab(tk.Frame):
                 csn_part,
             ]
             if result.is_pure_ascii:
-                status_parts[1] += "（编码不明确）"    # 纯 ASCII 无法确定编码，标注提示
+                status_parts[1] += "（编码不明确）"
             self._set_file_status(status_parts)
             self.result_table.clear()
         except Exception as e:
             logger.warning("Failed to select file %s: %s", p, e)
 
     def _get_strategy(self):
-        """从下拉框获取当前选中的错误处理策略函数。"""
+        """获取当前的错误处理策略"""
         return converter_get_strategy(self.err_cb.get())
 
     def _do_convert(self):
-        """执行编码转换的主入口。
-
-        流程：
-        1. 校验文件选择、源/目标编码是否一致
-        2. 对 Big5 目标编码给出繁简转换提示
-        3. 解码文件 → 兼容性扫描 → 若兼容性 < 100% 则弹窗警告
-        4. 调用 convert_file 执行实际转换
-        5. 更新状态栏 & 结果表格 & 日志
-        """
         if not self.selected_file:
             messagebox.showinfo("提示", "请先选择源文件")
             return
@@ -210,7 +172,6 @@ class EncodingConverterTab(tk.Frame):
 
         strategy = self._get_strategy()
 
-        # Big5 转换需要繁简转换，额外确认
         is_big5 = tgt_enc.upper() in ("BIG5", "BIG5-HKSCS")
         if is_big5:
             if not messagebox.askyesno(
@@ -220,13 +181,10 @@ class EncodingConverterTab(tk.Frame):
                 return
 
         try:
-            # 1. 解码文件获取 CharacterToken 列表
             tokens = file_to_tokens(self.selected_file)
 
-            # 2. 转换前兼容性扫描（预估目标编码是否能无损容纳所有字符）
             report = compatibility_scan(tokens, tgt_enc, s2t_convert=is_big5)
             if report.rate < 100:
-                # 组装兼容性警告信息
                 msg = (
                     f"兼容性：{report.rate:.1f}% "
                     f"（{report.compatible}/{report.total}）\n\n"
@@ -244,7 +202,7 @@ class EncodingConverterTab(tk.Frame):
                 msg += "\n继续执行替换（无法编码的字符将变为'?'）？"
                 if not messagebox.askyesno("兼容性警告", msg):
                     return
-            # 3. 执行实际转换并输出到文件
+
             result = convert_file(
                 self.selected_file, tokens, src_enc, tgt_enc,
                 CONVERT_DIR, strategy, s2t_convert=is_big5,
@@ -268,7 +226,6 @@ class EncodingConverterTab(tk.Frame):
             self._set_file_status(parts)
             self.result_table.display_results(self.conv_tokens)
 
-            # 组装日志信息（英文，供给 logging 模块记录）
             log_parts = [f"[Success] {self.selected_file.name} -> {out_path.name} ({src_enc} -> {tgt_enc})"]
             if verified:
                 log_parts.append(f"Verification: {'reversible' if reversible else 'not reversible'}")
@@ -281,7 +238,6 @@ class EncodingConverterTab(tk.Frame):
             if not result.all_match:
                 log_parts.extend(result.mismatch_log)
 
-            # 转换结果弹窗
             if not problem_count:
                 messagebox.showinfo("成功", f"转换完成：\n{out_path}")
             else:
@@ -294,43 +250,34 @@ class EncodingConverterTab(tk.Frame):
                     f"{problem_count} 个字符被替换为 '?'",
                 )
         except Exception as e:
-            # 捕获转换过程中的任何异常
             messagebox.showerror("错误", str(e))
 
     def _clear_results(self):
-        """清空转换结果及状态栏信息。"""
+        """清空转换结果"""
         self.conv_tokens = []
         self.result_table.clear()
         self.file_info_lbl.configure(text="")
 
     def _open_output(self):
-        """确保输出目录存在后，用系统文件管理器打开。"""
+        """打开输出目录"""
         CONVERT_DIR.mkdir(parents=True, exist_ok=True)
         os.startfile(str(CONVERT_DIR))
 
 
-# ---------------------------------------------------------------------------
-# EncodingViewerTab —— 编码查看器标签页
-# ---------------------------------------------------------------------------
 class EncodingViewerTab(tk.Frame):
-    """编码查看器标签页。支持打开文件或粘贴文本，实时分析每个字符在各种编码下的表现。"""
 
     def __init__(self, parent, **kwargs):
+        """初始化查看器标签页"""
         super().__init__(parent, **kwargs)
-        self.current_file = None         # 当前打开的文件路径
-        self.detected_encoding = ""      # 检测到的文件编码
-        self.current_tokens = []         # 当前字符的 CharacterToken 列表
-        self.analysis_results = []       # EncodingViewer 分析结果列表
-        self._last_dir = str(CHARS_DIR)  # 上次目录，用于对话框初始路径
+        self.current_file = None
+        self.detected_encoding = ""
+        self.current_tokens = []
+        self.analysis_results = []
+        self._last_dir = str(CHARS_DIR)
         self._setup_ui()
 
     def _setup_ui(self):
-        """构建查看器标签页的完整 UI 布局。
-
-        布局从上到下：工具栏 → 左右分栏（原始文本 / 编码分析表）→ 底部操作栏 → 状态栏。
-        使用 grid 实现左右等高分栏，左栏固定宽度、右栏自适应拉伸。
-        """
-        # ── 1. 顶部工具栏（打开 / 粘贴 / 清空 / 打开输出目录 + 编码标签） ──
+        """构建查看器标签页 UI"""
         top = tk.Frame(self, bg="#EBEBEB")
         tb = tk.Frame(top, bg="#EBEBEB")
         tb.pack(fill="x", padx=6, pady=3)
@@ -349,13 +296,11 @@ class EncodingViewerTab(tk.Frame):
                                  fg="#2E7D32", bg="#EBEBEB")
         self.enc_lbl.pack(side="right", padx=10)
 
-        # ── 2. 主内容区域（左：原始文本 / 右：编码分析表） ──
         content = tk.Frame(self)
         content.grid_rowconfigure(0, weight=1)
-        content.grid_columnconfigure(0, weight=0)  # 左栏：固定宽度，不随窗口拉伸
-        content.grid_columnconfigure(1, weight=1)  # 右栏：占满剩余空间
+        content.grid_columnconfigure(0, weight=0)
+        content.grid_columnconfigure(1, weight=1)
 
-        # --- 左栏：原始文本输入框（只读显示用） ---
         left_frm = tk.Frame(content, bg="#F2F2F2", bd=1, relief="solid")
         left_frm.grid(row=0, column=0, sticky="nsew", padx=(0, 3))
         left_frm.grid_rowconfigure(1, weight=1)
@@ -370,7 +315,7 @@ class EncodingViewerTab(tk.Frame):
         txt_in_frame.grid_columnconfigure(0, weight=1)
 
         self.txt_in = tk.Text(txt_in_frame, wrap="word", font=("Consolas", 11),
-                            width=35,  # 固定宽度 35 字符，使左栏不会随窗口变宽
+                            width=35,
                             bg="white", fg="#111111", relief="flat", borderwidth=0,
                             highlightthickness=0, padx=4, pady=2, insertbackground="#111111")
         txt_in_vbar = tk.Scrollbar(txt_in_frame, orient="vertical", command=self.txt_in.yview)
@@ -378,7 +323,6 @@ class EncodingViewerTab(tk.Frame):
         self.txt_in.grid(row=0, column=0, sticky="nsew")
         txt_in_vbar.grid(row=0, column=1, sticky="ns")
 
-        # --- 右栏：Canvas 编码分析表格（按字符逐行显示各编码的可用性） ---
         right_frm = tk.Frame(content, bg="#F2F2F2", bd=1, relief="solid")
         right_frm.grid(row=0, column=1, sticky="nsew", padx=(3, 0))
         right_frm.grid_rowconfigure(1, weight=1)
@@ -389,7 +333,6 @@ class EncodingViewerTab(tk.Frame):
         self.table = ColoredTable(right_frm)
         self.table.grid(row=1, column=0, sticky="nsew", padx=4, pady=(2, 4))
 
-        # ── 3. 底部操作栏（分析编码 / 图例 / 退出） ──
         bot = tk.Frame(self, bg="#EBEBEB")
         bb = tk.Frame(bot, bg="#EBEBEB")
         bb.pack(fill="x", padx=6, pady=3)
@@ -401,12 +344,10 @@ class EncodingViewerTab(tk.Frame):
         legend_frm.pack(side="right", padx=(0, 16))
         ColorLegend(legend_frm).pack()
 
-        # ── 4. 状态栏（显示文件、编码检测、字符统计信息） ──
         self.status = tk.Label(self, text=DEFAULT_STATUS, anchor="w",
                                 font=("Microsoft YaHei", 9),
                                 bg="#E0E0E0", fg="#666")
 
-        # ── 5. 组装各部分到主 Frame（顺序：上→中→底） ──
         self.status.pack(fill="x", side="bottom", padx=0, pady=0)
         create_horizontal_separator(self).pack(fill="x", side="bottom")
 
@@ -419,15 +360,11 @@ class EncodingViewerTab(tk.Frame):
         content.pack(fill="both", expand=True, side="top", padx=4, pady=4)
 
     def _set_status(self, msg):
-        """更新底部状态栏文本。"""
+        """更新状态栏"""
         self.status.configure(text=msg)
 
     def _open_file(self, file_path=None):
-        """弹出文件选择对话框，加载文件并立即进行编码检测与 Token 分析。
-
-        若 file_path 不为 None（如从 _open_output 回调），则跳过对话框直接打开。
-        分析后自动在右侧表格中显示各字符的编码兼容性。
-        """
+        """打开并分析文件"""
         if file_path is None:
             p = filedialog.askopenfilename(title="选择文本文件", initialdir=str(CHARS_DIR),
                                            filetypes=[("文本文件", "*.txt"), ("所有文件", "*.*")])
@@ -443,12 +380,10 @@ class EncodingViewerTab(tk.Frame):
             self.current_tokens = tokens
             self.current_file = p
 
-            # 复用共享检测管线（避免二次读取）
             _, result, csn_part = _detect_from_raw(raw_data, p)
 
             self.enc_lbl.configure(text=f"检测结果：{enc_name}  |  {csn_part}")
 
-            # 状态栏显示：编码名称（纯 ASCII 标注）、charset-normalizer 结果、各引擎诊断摘要
             pure = " (编码不明确)" if result.is_pure_ascii else ""
             diag = " | ".join(f"{n}:{r[:1]}" for n, _, r in result.trials)
             self._set_status(f"已打开：{p} | 检测结果：{enc_name}{pure} | {csn_part} | {diag}")
@@ -459,10 +394,7 @@ class EncodingViewerTab(tk.Frame):
             logger.exception("Failed to open file")
 
     def _paste_text(self):
-        """从系统剪贴板获取文本，填入左侧文本框。
-
-        清空之前的状态（文件路径、检测编码等），因为粘贴来源无文件编码信息。
-        """
+        """从剪贴板粘贴文本"""
         try:
             text = self.clipboard_get()
             self.txt_in.delete("1.0", "end")
@@ -476,7 +408,7 @@ class EncodingViewerTab(tk.Frame):
             messagebox.showinfo("提示", "剪贴板为空")
 
     def _clear_all(self):
-        """清空文本框、分析表格、Token 缓存及状态显示。"""
+        """清空所有内容和结果"""
         self.txt_in.delete("1.0", "end")
         self.table.clear()
         self.analysis_results = []
@@ -488,17 +420,12 @@ class EncodingViewerTab(tk.Frame):
         self._set_status("已清空")
 
     def _analyze(self):
-        """分析左侧文本框中的文本（非文件模式）。
-
-        将文本按 UTF-8 编码构建 CharacterToken，调用 charset-normalizer 辅助检测，
-        最后将结果渲染到右侧 ColoredTable 中并更新状态栏统计数据。
-        """
+        """分析文本框中文本的编码表示"""
         text = self.txt_in.get("1.0", "end").rstrip("\n")
         if not text:
             messagebox.showinfo("提示", "请先输入或打开文本")
             return
 
-        # 将每个字符按 UTF-8 编码构建 Token
         tokens = []
         raw_bytes = text.encode("utf-8")
         for ch in text:
@@ -510,7 +437,6 @@ class EncodingViewerTab(tk.Frame):
 
         self.current_tokens = tokens
 
-        # 检测文本编码（仅用于参考显示，不支持文件级别检测细粒度）
         csn_part = ""
         try:
             dr = detect_bytes(raw_bytes)
@@ -530,10 +456,7 @@ class EncodingViewerTab(tk.Frame):
         self._analyze_tokens(tokens)
 
     def _analyze_tokens(self, tokens):
-        """将 Token 列表传递给 EncodingViewer 进行分析并在表格中展示。
-
-        同时计算并显示概要统计：总字符数、各编码覆盖率、文件编码。
-        """
+        """执行编码分析并更新表格和状态栏"""
         self.analysis_results = EncodingViewer.analyze_tokens(tokens, fallback_encoding="")
         self.table.display_data(self.analysis_results)
         stats = EncodingViewer.get_statistics(self.analysis_results)
@@ -545,7 +468,7 @@ class EncodingViewerTab(tk.Frame):
         self._set_status(" | ".join(parts))
 
     def _open_output(self):
-        """打开输出目录并弹出文件选择对话框，选中的文件回传给 _open_file 继续分析。"""
+        """打开输出目录选择文件进行分析"""
         CONVERT_DIR.mkdir(parents=True, exist_ok=True)
         p = filedialog.askopenfilename(title="选择要检测的文件", initialdir=str(CONVERT_DIR),
                                        filetypes=[("文本文件", "*.txt"), ("所有文件", "*.*")])
@@ -554,5 +477,5 @@ class EncodingViewerTab(tk.Frame):
 
     @staticmethod
     def _quit():
-        """直接退出进程。"""
+        """退出程序"""
         sys.exit(0)

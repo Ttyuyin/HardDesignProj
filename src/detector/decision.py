@@ -1,58 +1,82 @@
-"""
-Layer 3: 决策引擎（编码判定层）
-
-Softmax 归一化、Agent 编排、基于文本内容的平局裁决。
-接收 Layer 2 各 Agent 的置信度分数，经过归一化和规则判定，
-输出最终的编码判定结果。
-"""
+"""Layer 3: 决策引擎 —— Softmax 归一化、排序、gap 判断、内容裁决"""
 
 import math
 from collections import Counter
 
-from encoding import resolve_std_name
+from encoding import DETECTION_ORDER, resolve_std_name
 from detector.text_analyzer import char_category
 
-from .agents import _ALL_AGENTS
+
+def decide(scores: dict[str, float], raw_data: bytes) -> dict:
+    """综合 L2 分数，执行 Softmax + 平局裁决，返回最终结果"""
+    names = list(scores.keys())
+    vals = [scores[n] for n in names]
+    probs = _softmax(vals, temperature=10.0)
+
+    ranked = sorted(zip(names, probs), key=lambda x: x[1], reverse=True)
+
+    if not ranked:
+        return {
+            "encoding": "UTF-8",
+            "std_name": "utf-8",
+            "confidence": 0.5,
+            "top_candidates": [],
+        }
+
+    winner_name, winner_prob = _resolve_winner(ranked, scores, raw_data)
+
+    std_name = resolve_std_name(winner_name)
+    return {
+        "encoding": winner_name,
+        "std_name": std_name,
+        "confidence": round(winner_prob, 4),
+        "top_candidates": [(n, round(p, 4)) for n, p in ranked],
+    }
 
 
 def _softmax(values: list[float], temperature: float = 10.0) -> list[float]:
-    """带温度参数和数值移位的 Softmax 归一化。
-
-    温度参数 temperature 的作用：
-    - temperature > 1：增大 softmax 输出的"平坦度"，使各候选编码的概率分布更均匀，
-      避免某个 Agent 的轻微领先被过度放大（本系统使用 10.0）
-    - temperature = 1：标准 softmax
-    - temperature < 1：放大差异，使高分者得分更高
-
-    数值移位（减去最大值）用于防止 exp 溢出。
-    """
+    """带温度参数和数值移位的 Softmax 归一化"""
     if not values:
         return []
     scaled = [v * temperature for v in values]
     mx = max(scaled)
-    shifted = [v - mx for v in scaled]       # 数值移位，保证最大指数项为 exp(0) = 1
+    shifted = [v - mx for v in scaled]
     exps = [math.exp(v) for v in shifted]
     s = sum(exps) or 1.0
     return [e / s for e in exps]
 
 
-def _run_agents(raw_data: bytes) -> dict[str, float]:
-    """遍历运行所有 Agent，合并各编码的置信度分数。"""
-    scores: dict[str, float] = {}
-    for agent in _ALL_AGENTS:
-        scores.update(agent(raw_data))
-    return scores
+def _resolve_winner(ranked, raw_scores, raw_data):
+    """当 top-2 差距 < 5% 时进入内容二次裁决，否则直接返回"""
+    top1_name, top1_prob = ranked[0]
+    top2_prob = ranked[1][1] if len(ranked) > 1 else 0.0
+    gap = top1_prob - top2_prob
+
+    if gap < 0.05 and len(ranked) > 1:
+        det_names = {enc.display_name for enc in DETECTION_ORDER}
+        tied = [
+            name for name, prob in ranked
+            if top1_prob - prob < 0.05 and name in det_names
+        ]
+
+        if len(tied) >= 2:
+            winner = _content_discriminator(tied, raw_data)
+            if winner:
+                return winner, top1_prob
+            for enc in DETECTION_ORDER:
+                if enc.display_name in tied:
+                    return enc.display_name, top1_prob
+        elif len(tied) == 1:
+            return tied[0], top1_prob
+        else:
+            if raw_scores.get("UTF-8", 0) > 0.5:
+                return "UTF-8", top1_prob
+
+    return top1_name, top1_prob
 
 
 def _content_discriminator(candidates: list[str], raw_data: bytes) -> str | None:
-    """通过解码文本中的唯一编码信号进行平局裁决。
-
-    当 softmax 后前两名差距 < 5% 时触发此函数。
-    利用各编码独有的字符特征区进行二次鉴定：
-    - Shift-JIS：检查是否含有平假名/片假名（kana ratio > 2%）
-    - Big5：检查是否含有注音符号（bopomofo ratio > 2%）
-    - 兜底策略：对比 CJK 统一表意文字比率 + 注音符号比率加权和
-    """
+    """通过假名/注音符号等唯一编码特征裁决平局"""
     decoded = {}
     for name in candidates:
         std = resolve_std_name(name)
@@ -63,7 +87,6 @@ def _content_discriminator(candidates: list[str], raw_data: bytes) -> str | None
         except Exception:
             continue
 
-    # Shift-JIS 特有信号：假名（平假名 + 片假名）
     if "Shift-JIS" in decoded:
         _, cats = decoded["Shift-JIS"]
         total = max(1, sum(cats.values()))
@@ -71,7 +94,6 @@ def _content_discriminator(candidates: list[str], raw_data: bytes) -> str | None
         if kana_ratio > 0.02:
             return "Shift-JIS"
 
-    # Big5 特有信号：注音符号
     if "Big5" in decoded:
         _, cats = decoded["Big5"]
         total = max(1, sum(cats.values()))
@@ -79,7 +101,6 @@ def _content_discriminator(candidates: list[str], raw_data: bytes) -> str | None
         if bpmf_ratio > 0.02:
             return "Big5"
 
-    # 通用兜底：对比 CJK 比率 + 注音符号比率（注音权重减半）
     best_name = None
     best_score = -1
     for name in candidates:

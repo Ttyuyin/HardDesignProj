@@ -73,7 +73,7 @@ python -m unittest discover -s tests -p "test_*.py" -v
 用户点击"打开文件"
     │
     ▼
-ui/tabs.py  ──→  services/detector_service.py  ──→  detector/pipeline.py
+ui/tabs.py  ──→  services/detector_service.py  ──→  detector/file_detector.py
  (选文件、调服务)    (diagnose_from_raw)              (FileEncodingDetector)
                                                           │
                                                ┌──────────┼──────────┐
@@ -96,7 +96,8 @@ ui/tabs.py  ──→  services/detector_service.py  ──→  detector/pipelin
 |------|------|
 | `ui/tabs.py` | 文件选择、调服务、更新界面 |
 | `services/detector_service.py` | 封装检测流程，返回 `DetectionResult` |
-| `detector/pipeline.py` | 编排 L1→L2→L3，公开 `FileEncodingDetector` |
+| `detector/file_detector.py` | 文件读取、诊断、token 生成的 `FileEncodingDetector` facade |
+| `detector/pipeline.py` | 编排 L1→L2→L3 |
 | `detector/anchors.py` | BOM / 纯 ASCII / UTF-16 结构判别 |
 | `detector/agents.py` | 7 个编码评分 Agent |
 | `detector/decision.py` | softmax + 内容消歧 |
@@ -216,7 +217,10 @@ src/
 │   ├── anchors.py             BOM / 纯 ASCII / UTF-16 结构锚点
 │   ├── agents.py              7 个编码评分 Agent
 │   ├── decision.py            softmax + 内容消歧
-│   ├── pipeline.py            FileEncodingDetector 流水线
+│   ├── file_detector.py       FileEncodingDetector facade
+│   ├── pipeline.py            L1/L2/L3 检测流水线
+│   ├── diagnostics.py         诊断辅助
+│   ├── tokenizer.py           CharacterToken 生成
 │   ├── byte_validator.py      GBK/Big5/SJIS 字节格式评分
 │   ├── text_analyzer.py       Unicode 字符分类统计
 │   └── decode_utils.py        strict_decode 封装

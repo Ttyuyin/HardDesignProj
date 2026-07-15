@@ -1,11 +1,4 @@
-"""
-独立验证器 —— 用 Python 标准库验证转换的正确性
-
-不依赖本项目的 EncodingConverter，
-避免自我循环验证的陷阱。
-原理：用纯 Python 标准库的 encode/decode 作为"裁判"，
-将本项目的转换结果与之对比，确保结果一致。
-"""
+"""独立验证器 —— 用 Python 标准库验证转换正确性"""
 
 from dataclasses import dataclass, field
 from typing import Optional
@@ -14,21 +7,9 @@ from shared.display_utils import codepoint_display
 from encoding import get_std_name
 
 
-# ---------------------------------------------------------------------------
-# 转换验证结果
-# ---------------------------------------------------------------------------
-
 @dataclass
 class ConversionVerdict:
-    """单次转换验证的结果
-
-    total_chars              — 总字符数（取原始和恢复的较大值）
-    match_count              — 匹配的字符数
-    mismatch_count           — 不匹配的字符数
-    is_valid_target_encoding — 输出文件是否合法目标编码
-    mismatches               — 不匹配详情（仅存前 20 条，避免大数据量过载）
-    error                    — 遇文件不存在等硬错误时填充
-    """
+    """单次转换验证的结果"""
     total_chars: int = 0
     match_count: int = 0
     mismatch_count: int = 0
@@ -38,35 +19,15 @@ class ConversionVerdict:
 
     @property
     def all_match(self) -> bool:
-        """所有字符均已无损还原"""
         return self.match_count == self.total_chars > 0
 
 
-# ---------------------------------------------------------------------------
-# 转换验证器
-# ---------------------------------------------------------------------------
-
 class ConversionVerifier:
-    """验证转换算法是否正确
-
-    用 Python 标准库（str.encode / bytes.decode）做独立验证，
-    不调用本项目的 Converter。
-    这是防止"自己验证自己"导致 bug 漏检的关键防线。
-    """
 
     @staticmethod
     def verify_roundtrip(original_tokens, output_path: str,
                          target_encoding: str) -> ConversionVerdict:
-        """验证输出文件是否能无损还原为原始字符序列
-
-        流程：
-          1. 以二进制方式读取输出文件
-          2. 用 Python 标准库解码输出文件 → 得到字符
-          3. 逐字符对比是否与原始 tokens 的字符一致
-          4. 记录不一致的位置和具体字符
-
-        返回 ConversionVerdict。
-        """
+        """回环验证：解码输出文件并与原始字符逐位比对"""
         try:
             with open(output_path, "rb") as f:
                 raw = f.read()
@@ -75,13 +36,10 @@ class ConversionVerifier:
 
         std_name = get_std_name(target_encoding)
 
-        # 用 Python 标准库验证目标编码有效性
-        # 这一步很重要：如果 Python 标准库都无法解码，说明输出文件本身就不合法
         try:
             recovered_text = raw.decode(std_name)
             is_valid = True
         except UnicodeDecodeError:
-            # 输出文件不是合法的目标编码文件，说明转换产生了非法字节序列
             return ConversionVerdict(
                 is_valid_target_encoding=False,
                 error=(
@@ -95,13 +53,12 @@ class ConversionVerifier:
         match_count = 0
         mismatch_count = 0
 
-        # 逐字符对比原始字符和还原后的字符
         for i, (orig, recv) in enumerate(zip(original_text, recovered_text)):
             if orig == recv:
                 match_count += 1
             else:
                 mismatch_count += 1
-                if len(mismatches) < 20:  # 只记录前 20 个不匹配，防止大文件撑爆内存
+                if len(mismatches) < 20:
                     mismatches.append({
                         "pos": i,
                         "original": orig,
@@ -110,7 +67,6 @@ class ConversionVerifier:
                         "recovered_cp": codepoint_display(recv),
                     })
 
-        # 长度不一致也记录（可能由非法字符被丢弃导致）
         len_diff = len(original_text) - len(recovered_text)
         if len_diff != 0:
             note = (
